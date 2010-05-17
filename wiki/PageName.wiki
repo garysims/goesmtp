@@ -1,23 +1,51 @@
-#summary Configuring goesmtp
+#summary MySQL tables
 
-= Configuation =
-
-Most of the server's configuration is done in the config.cfg file.
-
-= config.cfg =
+= MySQL Tables =
 
 {{{
-# goESMTP server configuration file
-[cluster]
-master=192.168.1.2
+create database goesmtp;
 
-[smtp]
-domains=example.com
+-- For OS X use the IP address as MAMP stores the mysql.sock file in a different place than
+-- Linux. For Linux use loclahost
 
-[db]
-type=MySQL
-username=user
-password=pass
-host=192.168.1.2
-database=goesmtp
+-- Add user for goesmtp database
+CREATE USER 'goesmtp'@'192.168.1.2' IDENTIFIED BY 'password';
+
+GRANT ALL PRIVILEGES ON * . * TO 'goesmtp'@'192.168.1.2' IDENTIFIED BY 'password' WITH GRANT OPTION MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0 ;
+
+GRANT ALL PRIVILEGES ON `goesmtp\_%` . * TO 'goesmtp'@'192.168.1.2';
+
+--
+-- TABLES
+--
+
+--
+-- Table structure for table `DHT`
+--
+
+CREATE TABLE `DHT` (
+  `id` bigint(20) NOT NULL,
+  `sha1` varchar(40) CHARACTER SET utf8 NOT NULL,
+  `mailbox` text CHARACTER SET utf8 NOT NULL,
+  `cached` timestamp NULL DEFAULT NULL,
+  `size` int(11) NOT NULL,
+  `orignodeid` int(11) NOT NULL,
+  PRIMARY KEY (`sha1`),
+  UNIQUE KEY `id` (`id`),
+  FULLTEXT KEY `mailbox` (`mailbox`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+--
+-- Table structure for table `newMessageLog`
+--
+
+CREATE TABLE `newMessageLog` (
+  `id` bigint(20) NOT NULL,
+  `sha1` varchar(40) CHARACTER SET utf8 NOT NULL,
+  `mailbox` text NOT NULL,
+  `size` int(11) NOT NULL,
+  PRIMARY KEY (`sha1`),
+  UNIQUE KEY `id` (`id`),
+  FULLTEXT KEY `mailbox` (`mailbox`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 }}}
