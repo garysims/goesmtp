@@ -1,0 +1,17 @@
+#summary One-sentence summary of this page.
+
+= Building =
+
+  # Install Go
+    * http://golang.org/doc/install.html
+  # Install git
+    * http://git-scm.com/download
+    * sudo apt-get install git-core
+  # Install GoMySQL
+    * http://github.com/Philio/GoMySQL
+    * git clone git://github.com/Philio/GoMySQL.git
+    * cd GoMySQL
+    * make
+    * make install
+  # Get Source for GoESMTP
+  # Make
