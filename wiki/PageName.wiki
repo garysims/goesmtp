@@ -1,0 +1,23 @@
+#summary Configuring goesmtp
+
+= Configuation =
+
+Most of the server's configuration is done in the config.cfg file.
+
+= config.cfg =
+
+{{{
+# goESMTP server configuration file
+[cluster]
+master=192.168.1.2
+
+[smtp]
+domains=example.com
+
+[db]
+type=MySQL
+username=user
+password=pass
+host=192.168.1.2
+database=goesmtp
+}}}
