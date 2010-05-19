@@ -1,0 +1,31 @@
+#summary Configuration
+
+To get goesmtp up and running you need to configure MySQL and create a config.cfg file in the goesmtp working directory.
+
+= MySQL =
+
+
+Add your content here.
+
+
+= config.cfg =
+
+{{{
+# goESMTP server configuration file
+[cluster]
+type=master
+id=1
+master=192.168.1.2
+ip=192.168.1.2
+
+[smtp]
+domains=example.com
+
+[db]
+type=MySQL
+username=username
+password=password
+host=192.168.1.2
+database=goesmtp
+# End
+}}}
