@@ -17,6 +17,18 @@ Now create the database
 mysql> create database goesmtp;
 }}}
 
+Now create a user who has access to the newly created database.
+
+_Note:_ If you are using OS X (with MAMP) use the IP address as MAMP stores the mysql.sock file in a different place than Linux. For Linux use localhost
+
+{{{
+CREATE USER 'goesmtp'@'192.168.1.2' IDENTIFIED BY 'password';
+
+GRANT ALL PRIVILEGES ON * . * TO 'goesmtp'@'192.168.1.2' IDENTIFIED BY 'password' WITH GRANT OPTION MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0 ;
+
+GRANT ALL PRIVILEGES ON `goesmtp\_%` . * TO 'goesmtp'@'192.168.1.2';
+}}}
+
 And finally apply the table from the [MySQLTables] page.
 
 = config.cfg =
