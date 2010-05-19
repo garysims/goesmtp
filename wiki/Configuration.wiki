@@ -29,7 +29,7 @@ GRANT ALL PRIVILEGES ON * . * TO 'goesmtp@localhost' IDENTIFIED BY 'password' WI
 GRANT ALL PRIVILEGES ON `goesmtp\_%` . * TO 'goesmtp@localhost';
 }}}
 
-And finally apply the table from the [MySQLTables] page.
+And finally add the tables from the [MySQLTables] page.
 
 = config.cfg =
 
