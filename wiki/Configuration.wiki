@@ -33,6 +33,8 @@ And finally add the tables from the [MySQLTables] page.
 
 = config.cfg =
 
+_Note:_ For OS X (with MAMP) use host=192.168.1.2 where 192.168.1.2 is the IP of the server.
+
 {{{
 # goESMTP server configuration file
 [cluster]
@@ -48,7 +50,7 @@ domains=example.com
 type=MySQL
 username=username
 password=password
-host=192.168.1.2
+host=localhost
 database=goesmtp
 # End
 }}}
