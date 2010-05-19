@@ -3,6 +3,9 @@
 = MySQL Tables =
 
 {{{
+
+use goesmtp;
+
 --
 -- TABLES
 --
