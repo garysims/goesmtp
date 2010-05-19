@@ -5,8 +5,19 @@ To get goesmtp up and running you need to configure MySQL and create a config.cf
 = MySQL =
 
 
-Add your content here.
+Login as the root user to the MySQL database... You will need to know the MySQL root user password. This is different to the root user account. The MySQL root user account was most likley set during installation.
 
+{{{
+$ mysql -u root -p
+}}}
+
+Now create the database
+
+{{{
+mysql> create database goesmtp;
+}}}
+
+And finally apply the table from the [MySQLTables] page.
 
 = config.cfg =
 
