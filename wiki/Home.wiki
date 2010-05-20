@@ -9,3 +9,5 @@ Goesmtp is a multi-node ESMTP server written on Go. Designed from the ground up 
 If a message is requested (over POP3 only at the moment, no IMAP4) that is not available on the local node, a request is sent to the node with the original message for transmission to the POP3 client.
 
 There is also a rudimentary level of replication and caching for redundancy and to minimize the inter-node traffic.
+
+More information: [Building] and [Configuration]
