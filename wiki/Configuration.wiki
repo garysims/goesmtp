@@ -35,6 +35,8 @@ And finally add the tables from the [MySQLTables] page.
 
 _Note:_ For OS X (with MAMP) use host=192.168.1.2 where 192.168.1.2 is the IP of the server.
 
+_Master:_ This is an example config.cfg for a single node system or for the master node in a cluster.
+
 {{{
 # goESMTP server configuration file
 [cluster]
@@ -49,6 +51,28 @@ domains=example.com
 [db]
 type=MySQL
 username=username
+password=password
+host=localhost
+database=goesmtp
+# End
+}}}
+
+_Slave:_ This is an example config.cfg for a slave (secondary) node in a cluster.
+
+{{{
+# goESMTP server configuration file
+[cluster]
+type=slave
+id=2
+master=192.168.1.2
+ip=192.168.1.3
+
+[smtp]
+domains=example.com
+
+[db]
+type=MySQL
+username=user
 password=password
 host=localhost
 database=goesmtp
