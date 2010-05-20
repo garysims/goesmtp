@@ -7,8 +7,32 @@
 use goesmtp;
 
 --
--- TABLES
+-- Table structure for table `delMessageCounter`
 --
+
+CREATE TABLE `delMessageCounter` (
+  `id` bigint(20) NOT NULL,
+  `nodeid` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `nodeid` (`nodeid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `delMessageLog`
+--
+
+CREATE TABLE `delMessageLog` (
+  `id` bigint(20) NOT NULL,
+  `sha1` varchar(40) CHARACTER SET utf8 NOT NULL,
+  `mailbox` text NOT NULL,
+  PRIMARY KEY (`sha1`),
+  UNIQUE KEY `id` (`id`),
+  FULLTEXT KEY `mailbox` (`mailbox`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
 
 --
 -- Table structure for table `DHT`
@@ -26,6 +50,21 @@ CREATE TABLE `DHT` (
   FULLTEXT KEY `mailbox` (`mailbox`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `newMessageCounter`
+--
+
+CREATE TABLE `newMessageCounter` (
+  `id` bigint(20) NOT NULL,
+  `nodeid` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `nodeid` (`nodeid`)
+) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
+-- --------------------------------------------------------
+
 --
 -- Table structure for table `newMessageLog`
 --
@@ -39,4 +78,5 @@ CREATE TABLE `newMessageLog` (
   UNIQUE KEY `id` (`id`),
   FULLTEXT KEY `mailbox` (`mailbox`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+
 }}}
