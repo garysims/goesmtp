@@ -93,16 +93,18 @@ func main() {
 						updateIDFile(1)
 					}
 				}
+			} else if(flag.Arg(i) == "createdirs") {
+				createWorkingDirs()
 			}
         }
 		os.Exit(0)
 	}
 
-	// This takes a little while to run, should only call if necessary...
-	// Need to add some checks to see if needs to be called... os.Stat???
-	// Or make it in real time for each message... Performance???
-	//createWorkingDirs()
-
+	if(checkWorkingDirs()==false) {
+		fmt.Printf("There seems to be a problem with the working directory structure. Do you need to run 'goesmtp createdirs'?\n")
+		os.Exit(-1)
+	}
+	
 	// Init the list of nodes in the cluster and accounts/passwords
  	G_nodes.Init()
  	G_passwords.Init()
