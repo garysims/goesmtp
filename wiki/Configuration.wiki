@@ -78,3 +78,17 @@ host=localhost
 database=goesmtp
 # End
 }}}
+
+= passwords.txt =
+The passwords.txt file defines the mailboxes for this mail server (across the whole cluster). The format is:
+{{{
+email-address:password:aliases
+}}}
+
+_Note:_ At the moment aliases aren't implemented.
+{{{
+fred@example.com:bluefish:
+bob@example.com:cola123:
+alice@example2.com:1qwerty23:
+john@example2.com:123pp:
+}}}
