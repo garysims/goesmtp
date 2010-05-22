@@ -55,13 +55,12 @@ var G_passwordLock sync.Mutex
 
 func getPasswordInfo(username string) (string, string) {
 	G_passwordLock.Lock()
+	defer G_passwordLock.Unlock()
  	for c := range G_passwords.Iter() {
 		if(c.(*passwordStruct).username == username) {
-			G_passwordLock.Unlock()
 			return c.(*passwordStruct).password, c.(*passwordStruct).alias
 		}
 	}	
-	G_passwordLock.Unlock()
 	return "", ""
 }
 

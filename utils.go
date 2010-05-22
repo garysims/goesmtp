@@ -400,13 +400,12 @@ func filename822AndPathFromSHA(shastr string) string {
 func findNodeIPFromNodeID(nodeid string) string {
 
 	G_nodesLock.Lock()
+	defer G_nodesLock.Unlock()
  	for c := range G_nodes.Iter() {
 		if(c.(*nodesInClusterStruct).nodeid == nodeid) {
-			G_nodesLock.Unlock()
 			return c.(*nodesInClusterStruct).ip
 		}
 	}	
-	G_nodesLock.Unlock()
 	return ""
 }
 

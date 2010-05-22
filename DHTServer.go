@@ -64,6 +64,7 @@ func (myDHTServer *DHTServerStruct) processRemoteNewMessageLog() {
 	// Go through list of remote nodes in cluster and process
 	// their new message log
 	G_nodesLock.Lock()
+	defer G_nodesLock.Unlock()
  	for c := range G_nodes.Iter() {
  		// Don't connect to ourselves!
 		if(c.(*nodesInClusterStruct).ip != G_IPAddress) {
@@ -73,7 +74,6 @@ func (myDHTServer *DHTServerStruct) processRemoteNewMessageLog() {
 			
 			if(errdial != nil) {
 				myDHTServer.logger.Logf(LMAX, "Can't connect to: %s (processRemoteNewMessageLog)", m)
-				G_nodesLock.Unlock()
 				return	
 			}
 	
@@ -82,7 +82,6 @@ func (myDHTServer *DHTServerStruct) processRemoteNewMessageLog() {
 			lineofbytes, err := buf.ReadBytes('\n');
 			if err != nil {
 				myDHTServer.logger.Log(LMIN, "Network connection unexpected closed while in processRemoteNewMessageLog.")			
-				G_nodesLock.Unlock()
 				return
 			}
 			
@@ -95,14 +94,12 @@ func (myDHTServer *DHTServerStruct) processRemoteNewMessageLog() {
 			if err != nil {
 				con.Close()
 				myDHTServer.logger.Log(LMIN, "Network connection unexpectly closed while receiving results.")			
-				G_nodesLock.Unlock()
 				return
 			} else {
 				lineofbytes = TrimCRLF(lineofbytes)
 				numberofrows, err = strconv.Atoi(string(lineofbytes))
 				if(err!=nil) {
 					myDHTServer.logger.Log(LMIN, "Unexpected result during NEWMSGS.")	
-					G_nodesLock.Unlock()
 					return
 				}
 			}
@@ -147,7 +144,6 @@ func (myDHTServer *DHTServerStruct) processRemoteNewMessageLog() {
 
 		}
 	}
-	G_nodesLock.Unlock()
 }
 
 func (myDHTServer *DHTServerStruct) processNewMessageLog() int{
@@ -280,6 +276,7 @@ func (myDHTServer *DHTServerStruct) processRemoteDelMessageLog() {
 	// Go through list of remote nodes in cluster and process
 	// their del message log
 	G_nodesLock.Lock()
+	defer G_nodesLock.Unlock()
  	for c := range G_nodes.Iter() {
  		// Don't connect to ourselves!
 		if(c.(*nodesInClusterStruct).ip != G_IPAddress) {
@@ -289,7 +286,6 @@ func (myDHTServer *DHTServerStruct) processRemoteDelMessageLog() {
 			
 			if(errdial != nil) {
 				myDHTServer.logger.Logf(LMAX, "Can't connect to: %s (processRemoteDelMessageLog)", m)
-				G_nodesLock.Unlock()
 				return	
 			}
 	
@@ -298,7 +294,6 @@ func (myDHTServer *DHTServerStruct) processRemoteDelMessageLog() {
 			lineofbytes, err := buf.ReadBytes('\n');
 			if err != nil {
 				myDHTServer.logger.Log(LMIN, "Network connection unexpected closed while in processRemoteNewMessageLog.")			
-				G_nodesLock.Unlock()
 				return
 			}
 			
@@ -311,14 +306,12 @@ func (myDHTServer *DHTServerStruct) processRemoteDelMessageLog() {
 			if err != nil {
 				con.Close()
 				myDHTServer.logger.Log(LMIN, "Network connection unexpectly closed while receiving results.")			
-				G_nodesLock.Unlock()
 				return
 			} else {
 				lineofbytes = TrimCRLF(lineofbytes)
 				numberofrows, err = strconv.Atoi(string(lineofbytes))
 				if(err!=nil) {
 					myDHTServer.logger.Log(LMIN, "Unexpected result during DELMSGS.")	
-					G_nodesLock.Unlock()
 					return
 				}
 			}
@@ -373,7 +366,6 @@ func (myDHTServer *DHTServerStruct) processRemoteDelMessageLog() {
 
 		}
 	}
-	G_nodesLock.Unlock()
 }
 
 func (myDHTServer *DHTServerStruct) processDelMessageLog() int{
@@ -703,6 +695,7 @@ func (myDHTServer *DHTServerStruct) pingMaster() {
 
 	G_nodesLock.Lock()
 	G_nodes.Init()
+	defer G_nodesLock.Unlock()
 	
 	for {
 		lineofbytes, err = buf.ReadBytes('\n');
@@ -716,7 +709,6 @@ func (myDHTServer *DHTServerStruct) pingMaster() {
 			if(len(fields) != 2) {
 				// Not enough fields, just list nodes in cluster and exit
 				myDHTServer.logger.Log(LMIN, "Unexpected result (not enough fields) during ping.")					
-				G_nodesLock.Unlock()
 				return
 			}
 			n := new(nodesInClusterStruct)
@@ -728,7 +720,6 @@ func (myDHTServer *DHTServerStruct) pingMaster() {
 			rowsreceived++
 		}
 	}
-	G_nodesLock.Unlock()
 
 	if(rowsreceived != numberofrows) {
 		myDHTServer.logger.Logf(LMIN, "pingMaster - Not enough results: wanted=%d got=%d", numberofrows, rowsreceived)
