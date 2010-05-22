@@ -89,6 +89,6 @@ _Note:_ At the moment aliases aren't implemented.
 {{{
 fred@example.com:bluefish:
 bob@example.com:cola123:
-alice@example2.com:1qwerty23:
-john@example2.com:123pp:
+alice@example2.com:qwerty23:
+john@example2.com:zxc123pp:
 }}}
