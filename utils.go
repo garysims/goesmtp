@@ -130,6 +130,9 @@ func getDomainFromHELO(s []byte) []byte {
 	return s[5:l]
 }
 
+// Create the working directory structure
+// This can be more efficient as MkdirAll creates the directory named,
+// along with any necessary parents
 func createWorkingDirs() {
 	var p string
 	const perms int = 0766
@@ -179,12 +182,10 @@ func createWorkingDirs() {
 	d1 := 0
 	d2 := 0
 	d3 := 0
-//	d4 := 1
 
 	for {
-//		p = fmt.Sprintf("%s/%s/%s/%s/%s", MESSAGESTOREDIR, atoz[d1], atoz[d2], atoz[d3], atoz[d4])
 		p = fmt.Sprintf("%s/%s/%s/%s", MESSAGESTOREDIR, atoz[d1], atoz[d2], atoz[d3])
-//		fmt.Println(p)
+		fmt.Printf("Creating %s\r", p)
 		os.MkdirAll(p, perms)
 		d1++	
 		if(d1 == 36) {
@@ -199,14 +200,11 @@ func createWorkingDirs() {
 					d2 = 0
 					d3 = 0
 					break
-//					d4++
-//					if(d4 == 36) {
-//						break
-//					}
 				}
 			}
 		}	
 	}
+	fmt.Printf("\nDone\n\n")	
 }
 
 func delAllFiles(path string) {
@@ -306,7 +304,66 @@ func purgeMessageStore() {
 			}
 		}	
 	}
+	fmt.Printf("\nDone\n\n")	
 }
+
+func checkWorkingDirs() bool {
+
+		// in directory
+		st, errst := os.Stat(INQUEUEDIR)
+		if(errst == nil) {
+			if(st.IsDirectory()==false) {
+				return false
+			}
+		} else {
+			return false
+		}
+
+		// out directory
+		st, errst = os.Stat(OUTQUEUEDIR)
+		if(errst == nil) {
+			if(st.IsDirectory()==false) {
+				return false
+			}
+		} else {
+			return false
+		}
+
+		// message store directory
+		st, errst = os.Stat(MESSAGESTOREDIR)
+		if(errst == nil) {
+			if(st.IsDirectory()==false) {
+				return false
+			}
+		} else {
+			return false
+		}
+
+		// messagestore/0/0/0
+		p := fmt.Sprintf("%s/0/0/0", MESSAGESTOREDIR)
+		st, errst = os.Stat(p)
+		if(errst == nil) {
+			if(st.IsDirectory()==false) {
+				return false
+			}
+		} else {
+			return false
+		}
+		
+		// And finally messagestore/z/z/z
+		p = fmt.Sprintf("%s/z/z/z", MESSAGESTOREDIR)
+		st, errst = os.Stat(p)
+		if(errst == nil) {
+			if(st.IsDirectory()==false) {
+				return false
+			}
+		} else {
+			return false
+		}
+		
+		return true
+}
+
 func getIDFromIDServer() string {
 	id := ""
 	
