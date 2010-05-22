@@ -60,6 +60,7 @@ func updateIDFile(id uint64) {
 
 func getIDFromIDFile() (uint64, os.Error) {
 	G_idServerLock.Lock()
+	defer G_idServerLock.Unlock()
 	fd, err := os.Open("id.txt", os.O_RDONLY, 0666)
 	if(err == nil) {
 		buf := bufio.NewReader(fd);
@@ -68,7 +69,6 @@ func getIDFromIDFile() (uint64, os.Error) {
 			lineofbytes = TrimCRLF(lineofbytes)
 			fmt.Printf("getIDFromIDFile: %s\n", string(lineofbytes))
 			fd.Close()
-			G_idServerLock.Unlock()
 			return strconv.Atoui64(string(lineofbytes))
 		} else {
 			fmt.Println("Error creating bufio.NewReader(fd)")
@@ -84,11 +84,9 @@ func getIDFromIDFile() (uint64, os.Error) {
 			fmt.Println("Can't open id.txt, but it does exist... FATAL.")
 			os.Exit(-2)
 		}
-		G_idServerLock.Unlock()
 		return 0, nil
 	}
 	
-	G_idServerLock.Unlock()
 	return 0, os.NewError("Impossible")
 }
 
