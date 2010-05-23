@@ -428,17 +428,20 @@ func (myRouter *routerStruct) startRouter() {
 		// In nano seconds, 1 second = 1 000 000 000 nanoseconds
 		time.Sleep(5000000000)
 	
-		dir, _ := os.Open(INQUEUEDIR, 0, 0666)
+		dir, direrr := os.Open(INQUEUEDIR, 0, 0666)
 		
-		fi, err := dir.Readdir(-1)
-		
-		if(err == nil) {
-			for i := 0; i < len(fi); i++ {
-				if(endingWith822.Match([]byte(fi[i].Name))) {
-					myRouter.logger.Logf(LMAX, "Processing %s\n", fi[i].Name)
-					myRouter.route(fi[i].Name)
+		if(direrr == nil) {		
+			fi, err := dir.Readdir(-1)
+			
+			if(err == nil) {
+				for i := 0; i < len(fi); i++ {
+					if(endingWith822.Match([]byte(fi[i].Name))) {
+						myRouter.logger.Logf(LMAX, "Processing %s\n", fi[i].Name)
+						myRouter.route(fi[i].Name)
+					}
 				}
-			}
+			}		
+			dir.Close()
 		}
 	}
 }
