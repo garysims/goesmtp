@@ -157,8 +157,8 @@ func (myDHTServer *DHTServerStruct) processNewMessageLog() int{
 
 	// Query newMessageLog
 	sql := fmt.Sprintf("SELECT * FROM newMessageLog WHERE id > %d order by id LIMIT 100", hid)
-	res := myDHTServer.db.Query(sql)
-	if myDHTServer.db.Errno != 0 {
+	res, mysqlerr := myDHTServer.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
 		os.Exit(1)
 	}
@@ -207,8 +207,8 @@ func (myDHTServer *DHTServerStruct) updateNewMessageCounter(id int64, nodeid str
 
 func (myDHTServer *DHTServerStruct) getHighestIDForNodeFromDHT(node string) int64 {
 	sql := fmt.Sprintf("SELECT max(id) FROM newMessageCounter WHERE nodeid = %s", node)
-	res := myDHTServer.db.Query(sql)
-	if myDHTServer.db.Errno != 0 {
+	res, mysqlerr := myDHTServer.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
 		return -1
 	} else {
@@ -248,8 +248,8 @@ func (myDHTServer *DHTServerStruct) updateDelMessageCounter(id int64, nodeid str
 
 func (myDHTServer *DHTServerStruct) getHighestIDFordelMessageLog(node string) int64 {
 	sql := fmt.Sprintf("SELECT max(id) FROM delMessageCounter WHERE nodeid = %s", node)
-	res := myDHTServer.db.Query(sql)
-	if myDHTServer.db.Errno != 0 {
+	res, mysqlerr := myDHTServer.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
 		return -1
 	} else {
@@ -377,8 +377,8 @@ func (myDHTServer *DHTServerStruct) processDelMessageLog() int{
 	
 	// Query delMessageLog
 	sql := fmt.Sprintf("SELECT * FROM delMessageLog WHERE id > %d order by id LIMIT 100", hid)
-	res := myDHTServer.db.Query(sql)
-	if myDHTServer.db.Errno != 0 {
+	res, mysqlerr := myDHTServer.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
 		return 0
 	}
@@ -475,8 +475,8 @@ func (myDHTServer *DHTServerStruct) sendNewMessageLog(con *net.TCPConn, hid stri
 
 	// Query DHT
 	sql := fmt.Sprintf("SELECT * FROM newMessageLog where id > %s order by id", hid)
-	res := myDHTServer.db.Query(sql)
-	if myDHTServer.db.Errno != 0 {
+	res, mysqlerr := myDHTServer.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
 		os.Exit(1)
 	}
@@ -501,8 +501,8 @@ func (myDHTServer *DHTServerStruct) sendDelMessageLog(con *net.TCPConn, hid stri
 
 	// Query DHT
 	sql := fmt.Sprintf("SELECT * FROM delMessageLog where id > %s order by id", hid)
-	res := myDHTServer.db.Query(sql)
-	if myDHTServer.db.Errno != 0 {
+	res, mysqlerr := myDHTServer.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
 		os.Exit(1)
 	}
@@ -533,8 +533,8 @@ func (myDHTServer *DHTServerStruct) dumpDHT(con *net.TCPConn) {
 
 	// Query DHT
 	sql := fmt.Sprintf("SELECT * FROM DHT order by id")
-	res := myDHTServer.db.Query(sql)
-	if myDHTServer.db.Errno != 0 {
+	res, mysqlerr := myDHTServer.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
 		os.Exit(1)
 	}

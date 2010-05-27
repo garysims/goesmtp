@@ -90,8 +90,8 @@ func (myPOP3 *POP3Struct) doListAll(con *net.TCPConn, user string) {
 	
 	// Query DHT
 	sql := fmt.Sprintf("SELECT id, size from DHT where mailbox='%s' order by id;", user)
-	res := myPOP3.db.Query(sql)
-	if myPOP3.db.Errno != 0 {
+	res, mysqlerr := myPOP3.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
 		os.Exit(1)
 	}
@@ -121,8 +121,8 @@ func (myPOP3 *POP3Struct) doListN(con *net.TCPConn, user string, msgnumstr strin
 	
 	// Query DHT
 	sql := fmt.Sprintf("SELECT id, size from DHT where mailbox='%s' order by id limit %d, 1;", user, msgnum - 1)
-	res := myPOP3.db.Query(sql)
-	if myPOP3.db.Errno != 0 {
+	res, mysqlerr := myPOP3.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
 		os.Exit(1)
 	}
@@ -159,8 +159,8 @@ func (myPOP3 *POP3Struct) doUIDLAll(con *net.TCPConn, user string) {
 	
 	// Query DHT
 	sql := fmt.Sprintf("SELECT id, sha1 from DHT where mailbox='%s' order by id;", user)
-	res := myPOP3.db.Query(sql)
-	if myPOP3.db.Errno != 0 {
+	res, mysqlerr := myPOP3.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
 		os.Exit(1)
 	}
@@ -190,8 +190,8 @@ func (myPOP3 *POP3Struct) doUIDLN(con *net.TCPConn, user string, msgnumstr strin
 	
 	// Query DHT
 	sql := fmt.Sprintf("SELECT id, sha1 from DHT where mailbox='%s' order by id limit %d, 1;", user, msgnum - 1)
-	res := myPOP3.db.Query(sql)
-	if myPOP3.db.Errno != 0 {
+	res, mysqlerr := myPOP3.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
 		os.Exit(1)
 	}
@@ -231,8 +231,8 @@ func (myPOP3 *POP3Struct) getStat(user string) (int64, int64) {
 	
 	// Query DHT
 	sql := fmt.Sprintf("SELECT sum(size), count(id) from DHT where mailbox='%s';", user)
-	res := myPOP3.db.Query(sql)
-	if myPOP3.db.Errno != 0 {
+	res, mysqlerr := myPOP3.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
 		os.Exit(1)
 	}
@@ -336,8 +336,8 @@ func (myPOP3 *POP3Struct) doRETR(con *net.TCPConn, user string, msgnumstr string
 	
 	// Query DHT
 	sql := fmt.Sprintf("SELECT id, sha1, orignodeid from DHT where mailbox='%s' order by id limit %d, 1;", user, msgnum - 1)
-	res := myPOP3.db.Query(sql)
-	if myPOP3.db.Errno != 0 {
+	res, mysqlerr := myPOP3.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
 	}
 
@@ -406,8 +406,8 @@ func (myPOP3 *POP3Struct) doDELE(con *net.TCPConn, user string, msgnumstr string
 func (myPOP3 *POP3Struct) getSHAKeyForID(msgnum int, user string) string {
 	// Query DHT
 	sql := fmt.Sprintf("SELECT sha1 from DHT where mailbox='%s' order by id limit %d, 1;", user, msgnum - 1)
-	res := myPOP3.db.Query(sql)
-	if myPOP3.db.Errno != 0 {
+	res, mysqlerr := myPOP3.db.Query(sql)
+	if mysqlerr != nil {
 		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
 		return ""
 	}
