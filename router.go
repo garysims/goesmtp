@@ -311,7 +311,7 @@ func (myRouter *routerStruct) routetorecipient(f string, fn821 string, fn822 str
 		os.Remove(fn822)
 	} else {
 		// Local delivery, move to message store
-		path := fmt.Sprintf("%s/%c/%c/%c", MESSAGESTOREDIR, shastr[39], shastr[38], shastr[37])
+		path := fmt.Sprintf("%s/%c/%c/%c/%c", MESSAGESTOREDIR, shastr[39], shastr[38], shastr[37], shastr[36])
 		myRouter.logger.Logf(LMAX, "Path in message store: %s", path)
 		
 		// Prepare to move files to message store
