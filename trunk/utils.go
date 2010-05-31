@@ -75,7 +75,8 @@ func SHA1File(filename string) []byte {
 			}
 		}
 	}
-		
+	
+	fd.Close()
 	return h.Sum()
 }
 
@@ -136,7 +137,7 @@ func getDomainFromHELO(s []byte) []byte {
 func createWorkingDirs() {
 	var p string
 	const perms int = 0766
-	var atoz = map[int] string {
+	var zerotof = map[int] string {
     0 : "0",
     1 : "1",
     2 : "2",
@@ -153,26 +154,6 @@ func createWorkingDirs() {
     13 : "d",
     14 : "e",
     15 : "f",
-    16 : "g",
-    17 : "h",
-    18 : "i",
-    19 : "j",
-    20 : "k",
-    21 : "l",
-    22 : "m",
-    23 : "n",
-    24 : "o",
-    25 : "p",
-    26 : "q",
-    27 : "r",
-    28 : "s",
-    29 : "t",
-    30 : "u",
-    31 : "v",
-    32 : "w",
-    33 : "x",
-    34 : "y",
-    35 : "z",    
 }
 	
 	os.Mkdir(INQUEUEDIR, perms)
@@ -182,24 +163,32 @@ func createWorkingDirs() {
 	d1 := 0
 	d2 := 0
 	d3 := 0
+	d4 := 0
 
 	for {
-		p = fmt.Sprintf("%s/%s/%s/%s", MESSAGESTOREDIR, atoz[d1], atoz[d2], atoz[d3])
+		p = fmt.Sprintf("%s/%s/%s/%s/%s", MESSAGESTOREDIR, zerotof[d1], zerotof[d2], zerotof[d3], zerotof[d4])
 		fmt.Printf("Creating %s\r", p)
 		os.MkdirAll(p, perms)
 		d1++	
-		if(d1 == 36) {
+		if(d1 == 16) {
 			d1 = 0
 			d2++
-			if(d2 == 36) {
+			if(d2 == 16) {
 				d1 = 0
 				d2 = 0
 				d3++
-				if(d3 == 36) {
+				if(d3 == 16) {
 					d1 = 0
 					d2 = 0
 					d3 = 0
-					break
+					d4++
+					if(d4 == 16) {
+						d1 = 0
+						d2 = 0
+						d3 = 0
+						d4 = 0
+						break
+					}
 				}
 			}
 		}	
@@ -238,7 +227,7 @@ fmt.Printf("Purging %s\r", path)
 func purgeMessageStore() {
 	var p string
 	const perms int = 0766
-	var atoz = map[int] string {
+	var zerotof = map[int] string {
     0 : "0",
     1 : "1",
     2 : "2",
@@ -255,26 +244,6 @@ func purgeMessageStore() {
     13 : "d",
     14 : "e",
     15 : "f",
-    16 : "g",
-    17 : "h",
-    18 : "i",
-    19 : "j",
-    20 : "k",
-    21 : "l",
-    22 : "m",
-    23 : "n",
-    24 : "o",
-    25 : "p",
-    26 : "q",
-    27 : "r",
-    28 : "s",
-    29 : "t",
-    30 : "u",
-    31 : "v",
-    32 : "w",
-    33 : "x",
-    34 : "y",
-    35 : "z",    
 }
 
 	delAllFiles(INQUEUEDIR)
@@ -283,23 +252,31 @@ func purgeMessageStore() {
 	d1 := 0
 	d2 := 0
 	d3 := 0
+	d4 := 0
 
 	for {
-		p = fmt.Sprintf("%s/%s/%s/%s", MESSAGESTOREDIR, atoz[d1], atoz[d2], atoz[d3])
+		p = fmt.Sprintf("%s/%s/%s/%s/%s", MESSAGESTOREDIR, zerotof[d1], zerotof[d2], zerotof[d3], zerotof[d4])
 		delAllFiles(p)
 		d1++	
-		if(d1 == 36) {
+		if(d1 == 16) {
 			d1 = 0
 			d2++
-			if(d2 == 36) {
+			if(d2 == 16) {
 				d1 = 0
 				d2 = 0
 				d3++
-				if(d3 == 36) {
+				if(d3 == 16) {
 					d1 = 0
 					d2 = 0
 					d3 = 0
-					break
+					d4++
+					if(d4 == 16) {
+						d1 = 0
+						d2 = 0
+						d3 = 0
+						d4 = 0
+						break
+					}
 				}
 			}
 		}	
@@ -339,8 +316,8 @@ func checkWorkingDirs() bool {
 			return false
 		}
 
-		// messagestore/0/0/0
-		p := fmt.Sprintf("%s/0/0/0", MESSAGESTOREDIR)
+		// messagestore/0/0/0/0
+		p := fmt.Sprintf("%s/0/0/0/0", MESSAGESTOREDIR)
 		st, errst = os.Stat(p)
 		if(errst == nil) {
 			if(st.IsDirectory()==false) {
@@ -350,8 +327,8 @@ func checkWorkingDirs() bool {
 			return false
 		}
 		
-		// And finally messagestore/z/z/z
-		p = fmt.Sprintf("%s/z/z/z", MESSAGESTOREDIR)
+		// And finally messagestore/f/f/f/f
+		p = fmt.Sprintf("%s/f/f/f/f", MESSAGESTOREDIR)
 		st, errst = os.Stat(p)
 		if(errst == nil) {
 			if(st.IsDirectory()==false) {
@@ -390,11 +367,11 @@ func getIDFromIDServer() string {
 }
 
 func pathFromSHA(shastr string) string {
-	return fmt.Sprintf("%s/%c/%c/%c", MESSAGESTOREDIR, shastr[39], shastr[38], shastr[37])
+	return fmt.Sprintf("%s/%c/%c/%c/%c", MESSAGESTOREDIR, shastr[39], shastr[38], shastr[37], shastr[36])
 }
 
 func filename822AndPathFromSHA(shastr string) string {
-	return fmt.Sprintf("%s/%c/%c/%c/%s.822", MESSAGESTOREDIR, shastr[39], shastr[38], shastr[37], shastr)
+	return fmt.Sprintf("%s/%c/%c/%c/%c/%s.822", MESSAGESTOREDIR, shastr[39], shastr[38], shastr[37], shastr[36], shastr)
 }
 
 func findNodeIPFromNodeID(nodeid string) string {
@@ -476,6 +453,7 @@ func truncateAllTables () {
 	DBpassword, _ := c.GetString("db", "password");
 	DBhost, _ := c.GetString("db", "host");
 	DBdatabase, _ := c.GetString("db", "database");
+	nodeID, _ := c.GetString("cluster", "id");
 
 	// Create new instance
 	db := mysql.New()
@@ -513,11 +491,26 @@ func truncateAllTables () {
 			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
 	}
 
+	sql := fmt.Sprintf("INSERT INTO delMessageCounter (id, nodeid) VALUES ('0', '%s')", nodeID)	
+	// Set delMessageCounter to 0
+	db.Query(sql)
+	if db.Errno != 0 {
+			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
+	}
+	
 	// Empty the current newMessageCounter table
 	db.Query("TRUNCATE TABLE newMessageCounter;")
 	if db.Errno != 0 {
 			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
 	}
+
+	sql = fmt.Sprintf("INSERT INTO newMessageCounter (id, nodeid) VALUES ('0', '%s')", nodeID)	
+	// Set newMessageCounter to 0
+	db.Query(sql)
+	if db.Errno != 0 {
+			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
+	}
+	
 }
 
 func compareConWithIPString(con *net.TCPConn, ip2 string) bool {

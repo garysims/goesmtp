@@ -40,7 +40,7 @@ var G_IPAddress string
 var G_domainOverride string = ""
 var G_clusterKey string
 
-const G_LoggingLevel = LMAX
+const G_LoggingLevel = LCRAZY
 
 func main() {
 	fmt.Printf("goESMTP %s starting...\n", VERSION)

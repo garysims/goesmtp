@@ -344,7 +344,7 @@ func (myDHTServer *DHTServerStruct) processRemoteDelMessageLog() {
 					// Just try to delete the file as if we have a copy (original or cached) it needs to
 					// be deleted
 			
-					path := fmt.Sprintf("%s/%c/%c/%c", MESSAGESTOREDIR, shastr[39], shastr[38], shastr[37])		
+					path := fmt.Sprintf("%s/%c/%c/%c/%c", MESSAGESTOREDIR, shastr[39], shastr[38], shastr[37], shastr[36])
 					dele822 := fmt.Sprintf("%s/%s.822", path, shastr)
 					myDHTServer.logger.Logf(LMAX, "Delete from message store: %s", dele822)
 					os.Remove(dele822)
@@ -407,7 +407,7 @@ func (myDHTServer *DHTServerStruct) processDelMessageLog() int{
 		// Just try to delete the file as if we have a copy (original or cached) it needs to
 		// be deleted
 		
-		path := fmt.Sprintf("%s/%c/%c/%c", MESSAGESTOREDIR, shastr[39], shastr[38], shastr[37])		
+		path := fmt.Sprintf("%s/%c/%c/%c/%c", MESSAGESTOREDIR, shastr[39], shastr[38], shastr[37], shastr[36])
 		dele822 := fmt.Sprintf("%s/%s.822", path, shastr)
 		myDHTServer.logger.Logf(LMAX, "Delete from message store: %s", dele822)
 		os.Remove(dele822)
@@ -707,16 +707,29 @@ func (myDHTServer *DHTServerStruct) pingMaster() {
 			fields := strings.Split(string(lineofbytes), " ", 0)
 
 			if(len(fields) != 2) {
-				// Not enough fields, just list nodes in cluster and exit
+				// Not enough fields
 				myDHTServer.logger.Log(LMIN, "Unexpected result (not enough fields) during ping.")					
 				return
 			}
-			n := new(nodesInClusterStruct)
-			n.ip = fields[0]
-			n.nodeid = fields[1]
-			n.lastPing = time.Seconds()
-			G_nodes.PushBack(n)
-			myDHTServer.logger.Logf(LCRAZY, "Other nodes in cluster: %s %s", n.ip, n.nodeid)
+			
+			G_nodesLock.Lock()
+			nodeFound := false
+ 			for c := range G_nodes.Iter() {
+				if((c.(*nodesInClusterStruct).ip == fields[0])) {
+					// Node already in the list... update lastPing field
+					nodeFound = true
+					c.(*nodesInClusterStruct).lastPing = time.Seconds()
+				}
+			}	
+			if(nodeFound==false) {
+				n := new(nodesInClusterStruct)
+				n.ip = fields[0]
+				n.nodeid = fields[1]
+				n.lastPing = time.Seconds()
+				G_nodes.PushBack(n)
+			}
+			G_nodesLock.Unlock()
+			myDHTServer.logger.Logf(LCRAZY, "Other nodes in cluster: %s %s", fields[0], fields[1])
 			rowsreceived++
 		}
 	}

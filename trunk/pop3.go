@@ -283,7 +283,7 @@ func (myPOP3 *POP3Struct) doRemoteRETR(con *net.TCPConn, sha1 string, orignodeid
 	}
 
 	// Get greeting
-	buf := bufio.NewReader(con);
+	buf := bufio.NewReader(dcon);
 	lineofbytes, err := buf.ReadBytes('\n');
 	if err != nil {
 		myPOP3.logger.Log(LMAX, "Network connection unexpectedly closed.")			
@@ -341,7 +341,6 @@ func (myPOP3 *POP3Struct) doRETR(con *net.TCPConn, user string, msgnumstr string
 		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
 	}
 
-//	i := 1
     // Process results
 	var row map[string] interface{}
 	for {
@@ -349,40 +348,37 @@ func (myPOP3 *POP3Struct) doRETR(con *net.TCPConn, user string, msgnumstr string
 		if row == nil {
 				break
 		}
-//		if(i==msgnum) {
-			orignodeid := fmt.Sprintf("%d", row["orignodeid"].(int))
-			if(orignodeid != G_nodeID) {
-				// Need to get the message from another server in the cluster
-				myPOP3.logger.Logf(LMED, "Need to get the message from another server in the cluster: %s", orignodeid)
-				myPOP3.doRemoteRETR(con, row["sha1"].(string), orignodeid)
-				return
-			} else {
-				sha := row["sha1"].(string)
+		orignodeid := fmt.Sprintf("%d", row["orignodeid"].(int))
+		if(orignodeid != G_nodeID) {
+			// Need to get the message from another server in the cluster
+			myPOP3.logger.Logf(LMED, "Need to get the message from another server in the cluster: %s", orignodeid)
+			myPOP3.doRemoteRETR(con, row["sha1"].(string), orignodeid)
+			return
+		} else {
+			sha := row["sha1"].(string)
+
+			fn := filename822AndPathFromSHA(sha)
+
+			body, errb := os.Open(fn, os.O_RDONLY, 0666)
 	
-				fn := filename822AndPathFromSHA(sha)
-	
-				body, errb := os.Open(fn, os.O_RDONLY, 0666)
-		
-				if (errb == nil) {
-					buf := bufio.NewReader(body);
-					con.Write([]byte("+OK message follows\r\n"))				
-					for {
-						lineofbytes, errl := buf.ReadBytes('\n');
-						if errl != nil {
-							body.Close()
-							break
-						} else {
-							con.Write(lineofbytes)
-						}
+			if (errb == nil) {
+				buf := bufio.NewReader(body);
+				con.Write([]byte("+OK message follows\r\n"))				
+				for {
+					lineofbytes, errl := buf.ReadBytes('\n');
+					if errl != nil {
+						body.Close()
+						break
+					} else {
+						con.Write(lineofbytes)
 					}
-				} else {
-					myPOP3.logger.Logf(LMIN, "doRETR - Can't open file: %s", fn)
 				}
-				con.Write([]byte(".\r\n"))
-				return
+			} else {
+				myPOP3.logger.Logf(LMIN, "doRETR - Can't open file: %s", fn)
 			}
-//		}
-//		i = i + 1
+			con.Write([]byte(".\r\n"))
+			return
+		}
 	}
 	con.Write([]byte("-ERR no such message\r\n"))
 }
