@@ -234,20 +234,47 @@ func (myRouter *routerStruct) addOurReceivedField(fd *os.File, mailfrom string, 
 	fd.Write([]byte(r))
 }
 
-func (myRouter *routerStruct) routetorecipient(f string, fn821 string, fn822 string, mailfrom string, rcptto string, helo string, ehlo string) {
+func (myRouter *routerStruct) routetorecipient(f string, fn821 string, fn822 string, mailfrom string, rcptto string, helo string, ehlo string) bool {
 	var addReturnPath bool
 	
 	myRouter.logger.Logf(LMAX, "routetorecipient: %s to %s", fn822, rcptto)
 
 	mailbox, _  := getPasswordInfo(rcptto)
 
-	fn := fmt.Sprintf("%s.route", fn822)
+	//
+	// Create a new .821 file with only ONE recipient for routing
+	//
+	routefn821 := fmt.Sprintf("%s.route", fn821)
 
 	myRouter.logger.Logf(LMAX, ".821 file is: %s", fn821)	
-	myRouter.logger.Logf(LMAX, ".822 file is: %s", fn822)	
-	myRouter.logger.Logf(LMAX, ".route file is: %s", fn)	
+	myRouter.logger.Logf(LMAX, ".821.route file is: %s", routefn821)
 	
-	fd, err := os.Open(fn, os.O_CREATE | os.O_RDWR, 0666)
+	fd, err := os.Open(routefn821, os.O_CREATE | os.O_RDWR, 0666)
+
+	if (err == nil) {
+		if(len(ehlo)==0) {
+			fd.Write([]byte(fmt.Sprintf("helo %s\r\n", helo)))	
+		} else {
+			fd.Write([]byte(fmt.Sprintf("ehlo %s\r\n", ehlo)))	
+		}
+		fd.Write([]byte(fmt.Sprintf("mail from:<%s>\r\n", mailfrom)))	
+		fd.Write([]byte(fmt.Sprintf("rcpt to:<%s>\r\n", rcptto)))	
+	} else {
+		myRouter.logger.Logf(LMIN, "Can't create file: %s", routefn821)
+		return false
+	}
+	fd.Close()
+	
+
+	//
+	// Create new .822 file with a new received field
+	//
+	routefn822 := fmt.Sprintf("%s.route", fn822)
+
+	myRouter.logger.Logf(LMAX, ".822 file is: %s", fn822)	
+	myRouter.logger.Logf(LMAX, ".822.route file is: %s", routefn822)	
+	
+	fd, err = os.Open(routefn822, os.O_CREATE | os.O_RDWR, 0666)
 
 	if (err == nil) {
 		if(mailbox=="") {
@@ -258,8 +285,8 @@ func (myRouter *routerStruct) routetorecipient(f string, fn821 string, fn822 str
 		myRouter.addOurReceivedField(fd, mailfrom, rcptto, helo, ehlo, f, fn822, addReturnPath)
 		
 	} else {
-		myRouter.logger.Logf(LMIN, "Can't create file: %s", fn)
-		os.Exit(-1)	
+		myRouter.logger.Logf(LMIN, "Can't create file: %s", routefn822)
+		return false
 	}
 
 	// Now open the original body file and add the rest of the data
@@ -285,13 +312,13 @@ func (myRouter *routerStruct) routetorecipient(f string, fn821 string, fn822 str
 
 	//
 	// At this point 0-1273590401-748974000.822.route has the body with the added
-	// recevied fields and is for only one recipient...
+	// recevied fields and is for only one recipient... (i.e. in the 821.route file)
 	// Now it can be routed
 	//
 
-	sha := SHA1File(fn)
+	sha := SHA1File(routefn822)
 	shastr := fmt.Sprintf("%x", sha)
-	myRouter.logger.Logf(LMAX, "sha1 for %s is %s", fn, shastr)
+	myRouter.logger.Logf(LMAX, "sha1 for %s is %s", routefn822, shastr)
 
 	// Local or remote delivery???
 	if(mailbox=="") {
@@ -306,9 +333,8 @@ func (myRouter *routerStruct) routetorecipient(f string, fn821 string, fn822 str
 		myRouter.logger.Logf(LMAX, ".822 in out queue: %s", newoq822)
 
 		// Move files to out queue
-		os.Rename(fn821, newoq821)
-		os.Rename(fn, newoq822)
-		os.Remove(fn822)
+		os.Rename(routefn821, newoq821)
+		os.Rename(routefn822, newoq822)
 	} else {
 		// Local delivery, move to message store
 		path := fmt.Sprintf("%s/%c/%c/%c/%c", MESSAGESTOREDIR, shastr[39], shastr[38], shastr[37], shastr[36])
@@ -319,10 +345,10 @@ func (myRouter *routerStruct) routetorecipient(f string, fn821 string, fn822 str
 		myRouter.logger.Logf(LMAX, ".822 in message store: %s", newms822)
 	
 		// Get the size of the body
-		stat, staterr := os.Stat(fn)	
+		stat, staterr := os.Stat(routefn822)	
 		
 		if(staterr != nil) {
-			myRouter.logger.Logf(LMIN, "Can't stat file: %s - FATAL", fn)
+			myRouter.logger.Logf(LMIN, "Can't stat file: %s - FATAL", routefn822)
 			os.Exit(-1)	
 		}
 		
@@ -330,15 +356,20 @@ func (myRouter *routerStruct) routetorecipient(f string, fn821 string, fn822 str
 		if(myRouter.updateNewMessageLog(shastr, stat.Size, rcptto)) {
 	
 			// Move files to message store
-			os.Rename(fn, newms822)
-			os.Remove(fn822)
-			os.Remove(fn821)
+			os.Rename(routefn822, newms822)
+		
+			// And remove the 821.route file as it isn't need...
+			// TBD Don't create it if you don't need it!
+			os.Remove(routefn821)
 		} else {
 			// Couldn't update DB... Remove the .route and leave the originals
 			// to be processed again later
-			os.Remove(fn)
+			os.Remove(routefn821)
+			os.Remove(routefn822)
 		}
 	}
+	
+	return true
 }
 
 func (myRouter *routerStruct) route(f string) {
@@ -363,6 +394,7 @@ func (myRouter *routerStruct) route(f string) {
 	fd, err := os.Open(fn821, os.O_RDONLY, 0666)
 
 	if (err == nil) {
+		anyProblems := false
 		buf := bufio.NewReader(fd);
 		for {
 			lineofbytes, errl := buf.ReadBytes('\n');
@@ -387,12 +419,18 @@ func (myRouter *routerStruct) route(f string) {
 					case rcpttoCmd.Match(lineofbytes):
 						rcptto = string(getAddressFromMailFrom(lineofbytes))
 						myRouter.logger.Logf(LMAX, "RCPT TO field: %s", rcptto)
-						myRouter.routetorecipient(f, fn821, fn822, mailfrom, rcptto, helo, ehlo)
+						if(myRouter.routetorecipient(f, fn821, fn822, mailfrom, rcptto, helo, ehlo) == false) {
+							anyProblems = true
+						}
 						break
 					default:
 						break
 				}
 			}
+		}
+		if(anyProblems == false) {
+			os.Remove(fn822)
+			os.Remove(fn821)
 		}
 	} else {
 		myRouter.logger.Logf(LMIN, "Can't open file: %s", fn821)		
