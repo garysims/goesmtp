@@ -13,7 +13,7 @@ use goesmtp;
 CREATE TABLE `delMessageCounter` (
   `id` bigint(20) NOT NULL,
   `nodeid` int(11) NOT NULL,
-  PRIMARY KEY (`id`),
+  KEY (`id`),
   KEY `nodeid` (`nodeid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
@@ -59,7 +59,7 @@ CREATE TABLE `DHT` (
 CREATE TABLE `newMessageCounter` (
   `id` bigint(20) NOT NULL,
   `nodeid` int(11) NOT NULL,
-  PRIMARY KEY (`id`),
+  KEY (`id`),
   KEY `nodeid` (`nodeid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
