@@ -96,7 +96,6 @@ func (myRouter *routerStruct) readPasswords() {
 				break
 			} else {
 				lineofbytes = TrimCRLF(lineofbytes)
-				fmt.Printf("readPasswords: %s\n", string(lineofbytes))
 				f := strings.Split(string(lineofbytes), ":", 0)
 				if(len(f)!=3) {
 					fmt.Printf("readPasswords: badly formatted line: %s\n", string(lineofbytes))
@@ -142,7 +141,6 @@ func (myRouter *routerStruct) askForPasswords() {
 			break
 		} else {
 			lineofbytes = TrimCRLF(lineofbytes)
-			fmt.Printf("askForPasswords: %s\n", string(lineofbytes))
 			f := strings.Split(string(lineofbytes), ":", 0)
 			if(len(f)!=3) {
 				fmt.Printf("askForPasswords: badly formatted line: %s\n", string(lineofbytes))

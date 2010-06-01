@@ -80,7 +80,7 @@ func (mySMTPOut *smtpOutStruct) getAndCheckResp(buf *bufio.Reader, code string) 
 	return false
 }
 
-func (mySMTPOut *smtpOutStruct) createNDN(sender string, failedrcptto string, origfn822 string) bool {
+func (mySMTPOut *smtpOutStruct) createNDN(sender string, failedrcptto string, origfn822 string, reason string) bool {
 
 	ndn821 := fmt.Sprintf("%s/NDN-%s1.tmp", INQUEUEDIR, origfn822[0:len(origfn822)-1])
 	ndn822 := fmt.Sprintf("%s/NDN-%s.tmp", INQUEUEDIR, origfn822)
@@ -139,6 +139,11 @@ func (mySMTPOut *smtpOutStruct) createNDN(sender string, failedrcptto string, or
 		fd.WriteString("Delivery to the following recipient failed permanently:\r\n\r\n")
 		fd.WriteString(failedrcptto)
 		fd.WriteString("\r\n\r\n")
+		if(len(reason)>0) {
+			fd.WriteString("The reason for the rejection is:\r\n\r\n")
+			fd.WriteString(reason)
+			fd.WriteString("\r\n\r\n")
+		}
 		fd.WriteString("----- Original message -----\r\n\r\n")
 
 		// Now open the original body file and add the rest of the data
@@ -256,7 +261,7 @@ func (mySMTPOut *smtpOutStruct) sendBySMTP(fn821 string, fn822 string, mailfrom 
 										// 550-5.7.1 [X.X.X.X] The IP you're using to send mail is not authorized to										
 										mySMTPOut.logger.Logf(LMAX, "Server (%s) didn't like the data (RFC822 body) sent", toserver)
 										// Send NDN
-										if(mySMTPOut.createNDN(mailfrom, rcptto, fn822)) {
+										if(mySMTPOut.createNDN(mailfrom, rcptto, fn822, "")) {
 											os.Remove(fmt.Sprintf("%s/%s", OUTQUEUEDIR, fn822))
 											os.Remove(fn821)
 										}
@@ -267,7 +272,7 @@ func (mySMTPOut *smtpOutStruct) sendBySMTP(fn821 string, fn822 string, mailfrom 
 								}
 							} else {
 								// Bad response to RCPT TO... Send NDN
-								if(mySMTPOut.createNDN(mailfrom, rcptto, fn822)) {
+								if(mySMTPOut.createNDN(mailfrom, rcptto, fn822, "The remote server refused to accept the messgae for this recipient.")) {
 									os.Remove(fmt.Sprintf("%s/%s", OUTQUEUEDIR, fn822))
 									os.Remove(fn821)										
 								}
@@ -289,7 +294,7 @@ func (mySMTPOut *smtpOutStruct) sendBySMTP(fn821 string, fn822 string, mailfrom 
 					// because the ip is in Spamhaus's list; see http://postmaster.yahoo.com/550-bl23.html					
 					// Send NDN
 					mySMTPOut.logger.Logf(LMAX, "Bad greeting from server %s", toserver)
-					if(mySMTPOut.createNDN(mailfrom, rcptto, fn822)) {
+					if(mySMTPOut.createNDN(mailfrom, rcptto, fn822, "The remote server is refusing to accept connections from this server.")) {
 						os.Remove(fmt.Sprintf("%s/%s", OUTQUEUEDIR, fn822))
 						os.Remove(fn821)
 					}
@@ -302,7 +307,7 @@ func (mySMTPOut *smtpOutStruct) sendBySMTP(fn821 string, fn822 string, mailfrom 
 		} else {
 			// No MX records, create NDN or deadletter accordingly
 			mySMTPOut.logger.Logf(LMED, "No MX records for: %s", rcptto)
-			if(mySMTPOut.createNDN(mailfrom, rcptto, fn822)) {
+			if(mySMTPOut.createNDN(mailfrom, rcptto, fn822, "There is no delivery information for that domain or the domain doesn't exist.")) {
 				os.Remove(fmt.Sprintf("%s/%s", OUTQUEUEDIR, fn822))
 				os.Remove(fn821)										
 			}			

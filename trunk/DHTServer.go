@@ -40,6 +40,7 @@ import (
 type nodesInClusterStruct struct {
 	ip string
 	nodeid string
+	nodetype string
 	lastPing int64
 }
 
@@ -440,6 +441,7 @@ func NewDHTServer() (myDHTServer *DHTServerStruct) {
  	n := new(nodesInClusterStruct)
  	n.ip = G_IPAddress
  	n.nodeid = G_nodeID
+ 	n.nodetype = G_nodeType
  	n.lastPing = time.Seconds()
 	G_nodes.PushBack(n)
 	G_nodesLock.Unlock()
@@ -556,21 +558,23 @@ func (myDHTServer *DHTServerStruct) dumpDHT(con *net.TCPConn) {
 }
 
 //
-// PING node nodeid hash
-// PING 192.168.1.5 1 cf81a8580f8296424ee7589c3aca3b83981af958
+// Receive and process a new ping
+// 
+// PING node nodeid nodetype hash
+// PING 192.168.1.5 1 slave cf81a8580f8296424ee7589c3aca3b83981af958
 //
 func (myDHTServer *DHTServerStruct) newPing(con *net.TCPConn, s string, chall string) {
 	
 	fields := strings.Split(s, " ", 0)
 
-	if(len(fields) != 4) {
+	if(len(fields) != 5) {
 		// Not enough fields just exit
 		myDHTServer.logger.Logf(LMED, "Received ping with insufficient params")	
 		return
 	}
 	
 	// Authenticate
-	sharesp := fields[3]	
+	sharesp := fields[4]	
 	shap := SHA1String(fmt.Sprintf("%s%s", chall, G_clusterKey))
 	shastr := fmt.Sprintf("%x", shap)
 	if(shastr != sharesp) {
@@ -602,11 +606,12 @@ func (myDHTServer *DHTServerStruct) newPing(con *net.TCPConn, s string, chall st
  	n := new(nodesInClusterStruct)
  	n.ip = fields[1]
  	n.nodeid = fields[2]
+ 	n.nodetype = fields[3]
  	n.lastPing = time.Seconds()
 	G_nodes.PushBack(n)
 	G_nodesLock.Unlock()
 
-	myDHTServer.logger.Logf(LMED, "New node joins cluster %s %s", fields[1], fields[2])
+	myDHTServer.logger.Logf(LMED, "New %s node joins cluster %s %s", fields[3], fields[1], fields[2])
 	myDHTServer.listCluster(con)
 }
 
@@ -619,7 +624,7 @@ func (myDHTServer *DHTServerStruct) listCluster(con *net.TCPConn) {
 
 
  	for c := range G_nodes.Iter() {
-		r = fmt.Sprintf("%s %s\r\n", c.(*nodesInClusterStruct).ip, c.(*nodesInClusterStruct).nodeid)
+		r = fmt.Sprintf("%s %s %s\r\n", c.(*nodesInClusterStruct).ip, c.(*nodesInClusterStruct).nodeid, c.(*nodesInClusterStruct).nodetype)
 		con.Write([]byte(r))
  	}
 	G_nodesLock.Unlock()
@@ -675,7 +680,7 @@ func (myDHTServer *DHTServerStruct) pingMaster() {
 	// e.g. <10038.1274507578@example.com>password
 	respstr := fmt.Sprintf("%s%s", f[1], G_clusterKey)
 	respsha := fmt.Sprintf("%x", SHA1String(respstr))
-	con.Write([]byte(fmt.Sprintf("PING %s %s %s\r\n", G_IPAddress, G_nodeID, respsha)))
+	con.Write([]byte(fmt.Sprintf("PING %s %s %s %s\r\n", G_IPAddress, G_nodeID, G_nodeType, respsha)))
 	
 	// Reply is a list of nodes in the cluster	
 	// First line of reply is number of results
@@ -695,7 +700,7 @@ func (myDHTServer *DHTServerStruct) pingMaster() {
 
 	G_nodesLock.Lock()
 	G_nodes.Init()
-	defer G_nodesLock.Unlock()
+	G_nodesLock.Unlock()
 	
 	for {
 		lineofbytes, err = buf.ReadBytes('\n');
@@ -706,7 +711,7 @@ func (myDHTServer *DHTServerStruct) pingMaster() {
 			lineofbytes = TrimCRLF(lineofbytes)
 			fields := strings.Split(string(lineofbytes), " ", 0)
 
-			if(len(fields) != 2) {
+			if(len(fields) != 3) {
 				// Not enough fields
 				myDHTServer.logger.Log(LMIN, "Unexpected result (not enough fields) during ping.")					
 				return
@@ -725,11 +730,12 @@ func (myDHTServer *DHTServerStruct) pingMaster() {
 				n := new(nodesInClusterStruct)
 				n.ip = fields[0]
 				n.nodeid = fields[1]
+				n.nodetype = fields[2]
 				n.lastPing = time.Seconds()
 				G_nodes.PushBack(n)
 			}
 			G_nodesLock.Unlock()
-			myDHTServer.logger.Logf(LCRAZY, "Other nodes in cluster: %s %s", fields[0], fields[1])
+			myDHTServer.logger.Logf(LCRAZY, "Other nodes in cluster: %s %s %s", fields[0], fields[1], fields[2])
 			rowsreceived++
 		}
 	}
