@@ -25,10 +25,12 @@ import (
 "os"
 )
 
-const LMIN = 0
-const LMED = 1
-const LMAX = 2
-const LCRAZY = 3
+const LOFF = 0
+const LERRORSONLY = 1
+const LMIN = 2
+const LMED = 3
+const LMAX = 4
+const LCRAZY = 5
 
 type LogStruct struct {
 	Logging         bool
@@ -48,6 +50,12 @@ func NewLogger(p string, level int) (mylog *LogStruct) {
         mylog.Logging = true
         mylog.Level = level
         switch level {
+        	case LOFF:
+        		mylog.Flags = 0
+        		break;
+        	case LERRORSONLY:
+        		mylog.Flags = log.Ltime
+        		break;
         	case LMIN:
         		mylog.Flags = log.Ltime
         		break;

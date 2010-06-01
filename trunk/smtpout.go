@@ -85,6 +85,7 @@ func (mySMTPOut *smtpOutStruct) createNDN(sender string, failedrcptto string, or
 	ndn821 := fmt.Sprintf("%s/NDN-%s1.tmp", INQUEUEDIR, origfn822[0:len(origfn822)-1])
 	ndn822 := fmt.Sprintf("%s/NDN-%s.tmp", INQUEUEDIR, origfn822)
 
+	mySMTPOut.logger.Logf(LMIN, "Send NDN to %s for failed recipient %s", sender, failedrcptto)
 	mySMTPOut.logger.Logf(LMAX, "Files for NDN are: %s %s", ndn821, ndn822)
 	
 	// Create the .821 file
@@ -220,7 +221,7 @@ func (mySMTPOut *smtpOutStruct) sendBySMTP(fn821 string, fn822 string, mailfrom 
 		mx, prefs, err := LookupMX(parts[1])
 		if(err == nil) {
 			toserver := mySMTPOut.findPrefMX(mx, prefs)
-			
+			mySMTPOut.logger.Logf(LMIN, "Send message for %s to %s", rcptto, toserver)
 			m := fmt.Sprintf("%s:25", toserver)
 			con, errdial := net.Dial("tcp", "", m)
 			if(errdial == nil) {
@@ -250,8 +251,15 @@ func (mySMTPOut *smtpOutStruct) sendBySMTP(fn821 string, fn822 string, mailfrom 
 										os.Remove(fmt.Sprintf("%s/%s", OUTQUEUEDIR, fn822))
 										os.Remove(fn821)										
 									} else {
-										// Doesn't like data sent
+										// Doesn't like data sent... Again this could be because of SPAM filtering
+										// For example Google reply to the DATA (after it is sent) with:
+										// 550-5.7.1 [X.X.X.X] The IP you're using to send mail is not authorized to										
 										mySMTPOut.logger.Logf(LMAX, "Server (%s) didn't like the data (RFC822 body) sent", toserver)
+										// Send NDN
+										if(mySMTPOut.createNDN(mailfrom, rcptto, fn822)) {
+											os.Remove(fmt.Sprintf("%s/%s", OUTQUEUEDIR, fn822))
+											os.Remove(fn821)
+										}
 									}
 								} else {
 									// Doesn't like DATA command
@@ -274,7 +282,17 @@ func (mySMTPOut *smtpOutStruct) sendBySMTP(fn821 string, fn822 string, mailfrom 
 					}
 				} else {
 					// Can't connect to the server or didn't get a 220 response from greeting
+					// Probably means the remote server isn't accepting the connection
+					// due to spam worries.
+					// For exampple this is what Yahoo says:
+					// 553 5.7.1 [BL21] Connections will not be accepted from X.X.X.X,
+					// because the ip is in Spamhaus's list; see http://postmaster.yahoo.com/550-bl23.html					
+					// Send NDN
 					mySMTPOut.logger.Logf(LMAX, "Bad greeting from server %s", toserver)
+					if(mySMTPOut.createNDN(mailfrom, rcptto, fn822)) {
+						os.Remove(fmt.Sprintf("%s/%s", OUTQUEUEDIR, fn822))
+						os.Remove(fn821)
+					}
 				}
 				con.Close()
 			} else {
