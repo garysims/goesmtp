@@ -121,9 +121,9 @@ func getAddressFromRcptTo(s []byte) []byte {
 	return s[ab+1:l-1]
 }
 
-func getFilenameForMsg(serverid int) string {
+func getFilenameForMsg(serverid int, msgsForThisConnection int) string {
 	t1, t2, _ := os.Time();
-	return fmt.Sprintf("%d-%d-%d", serverid, t1, t2)
+	return fmt.Sprintf("%d-%d-%d-%d", serverid, t1, t2, msgsForThisConnection)
 }
 
 func getDomainFromHELO(s []byte) []byte {

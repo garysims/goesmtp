@@ -137,7 +137,7 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 	var helodomain string = ""
 	var ehlodomain string = ""
 	rcptsi := 0
-	msgFilename := getFilenameForMsg(workerid)
+	msgsForThisConnection := 0
 	
 	quitCmd, _ := regexp.Compile("^quit");
 	heloCmd, _ := regexp.Compile("^helo ");
@@ -164,7 +164,6 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 	{
 		lineofbytes, err := buf.ReadBytes('\n');
 		if err != nil {
-			print("Client disconnected rudely\n");
 			con.Close()
 			disconnected = true;
 			break
@@ -179,13 +178,15 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 					case quitCmd.Match(lineofbytesL):
 						con.Write([]byte("221 Bye for now\r\n"))
 						con.Close();
-						print("Client disconnected nicely\n");
 						disconnected = true;
 						break;
 					case heloCmd.Match(lineofbytesL):
 						helodomain = string(getDomainFromHELO(lineofbytes))
 						helor := fmt.Sprintf("250 %s nice to meet you.\r\n", helodomain)
 						con.Write([]byte(helor))
+						// HELO / EHLO is also like a RSET
+						rcptsi = 0
+						mailfrom = ""
 						break;
 					case ehloCmd.Match(lineofbytesL):
 						ehlodomain = string(getDomainFromHELO(lineofbytes))
@@ -193,9 +194,14 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 						con.Write([]byte(ehlor))
 						con.Write([]byte("250-AUTH=PLAIN\r\n"))
 						con.Write([]byte("250 AUTH PLAIN\r\n"))
+						// HELO / EHLO is also like a RSET
+						rcptsi = 0
+						mailfrom = ""
 						break;
 					case mailfromCmd.Match(lineofbytesL):
 						if( (len(helodomain) > 0) || (len(ehlodomain) > 0) ) {
+							// Beginning of a new mail transaction
+							rcptsi = 0			
 							mailfrom = string(lineofbytesL)
 							mailfromaddr := string(getAddressFromMailFrom(lineofbytes))
 							if((strings.Index(mailfromaddr, "@") != -1) && (strings.Index(mailfromaddr, ".") != -1)) {
@@ -203,6 +209,7 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 							} else {
 								con.Write([]byte("550 Bad email address\r\n"))							
 							}
+							msgsForThisConnection++
 						} else {
 							con.Write([]byte("503 Bad sequence of commands\r\n"))
 						}						
@@ -237,12 +244,13 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 					case dataCmd.Match(lineofbytesL):
 						if( (len(mailfrom) > 0) && (rcptsi > 0) ) {
 							con.Write([]byte("354 End data with <CR><LF>.<CR><LF>\r\n"))
-
+							
+							msgFilename := getFilenameForMsg(workerid, msgsForThisConnection)
 							mySMTP.squirtHeaderToFile(helodomain, ehlodomain, mailfrom, rcpts, rcptsi, msgFilename)
 							
 							if (mySMTP.recvBodyToFile(con, hostname, helodomain, ehlodomain, msgFilename) == true) {
 								mvToInQueue(msgFilename)
-								mySMTP.logger.Logf(LMED, "Message received: %s\n", msgFilename)
+								mySMTP.logger.Logf(LMIN, "New message received from %s (%s)\n", mailfrom, msgFilename)
 								con.Write([]byte("250 OK\r\n"))
 							} else {
 								con.Write([]byte("554 Transaction failed\r\n"))
@@ -257,6 +265,7 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 					case rsetCmd.Match(lineofbytesL):
 						rcptsi = 0
 						mailfrom = ""
+						msgsForThisConnection++
 						con.Write([]byte("250 OK\r\n"))
 						break;
 					case vrfyCmd.Match(lineofbytesL):

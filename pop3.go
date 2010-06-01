@@ -500,6 +500,7 @@ func (myPOP3 *POP3Struct) handleConnection(con *net.TCPConn) {
 								md5ps := fmt.Sprintf("%x", md5p)
 								if(md5ps == password) {
 									con.Write([]byte("+OK\r\n"))
+									myPOP3.logger.Logf(LMIN, "Successful POP3 login from %s", user)
 									authenticated = true
 								} else {
 									con.Write([]byte("-ERR\r\n"))
@@ -549,6 +550,7 @@ func (myPOP3 *POP3Struct) handleConnection(con *net.TCPConn) {
 							if(password == ourpassword) {
 								authenticated = true						
 								con.Write([]byte("+OK\r\n"))
+								myPOP3.logger.Logf(LMIN, "Successful POP3 login from %s", user)
 							} else {
 								con.Write([]byte("-ERR\r\n"))
 								authenticated = false							
