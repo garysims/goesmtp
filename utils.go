@@ -23,7 +23,8 @@ package main
 import (
 "crypto/sha1"
 "crypto/md5"
- "os"
+"crypto/hmac"
+"os"
 "strings"
 "fmt"
 "bufio"
@@ -87,6 +88,20 @@ func MD5String(s string) string {
 	return string(h.Sum())
 }
 
+func keyedMD5(key string, s string) string {
+	var kb []byte = make([]byte, 64)
+	
+	for i:=0 ; i < 64 ; i++ {
+		if(i >= len(key)) {
+			kb[i] = 0
+		} else {
+			kb[i] = []byte(key)[i]
+		}
+	}
+	h := hmac.NewMD5(kb)
+	h.Write([]byte(s))
+	return fmt.Sprintf("%x", h.Sum())
+}
 
 func GetHomedir() string {
 	env := os.Environ()
@@ -101,7 +116,7 @@ func GetHomedir() string {
 func TrimCRLF(s []byte) []byte {
     start, end := 0, len(s) - 1
     for start < end {
-        if s[end] != '\r' && s[end] != '\n' {
+        if s[end] != '\r' && s[end] != '\n' && s[end] != 0 {
             break
         }
         end -= 1
@@ -385,6 +400,29 @@ func findNodeIPFromNodeID(nodeid string) string {
 	}	
 	return ""
 }
+
+func encodeBase64String(s string) string {
+	var dest []byte
+	var plain []byte
+	
+	encoding := base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+
+	plain = bytes.Add(plain, []byte(s))
+	dest = make([]byte, encoding.EncodedLen(len(plain))); 
+	encoding.Encode(dest, []byte(plain))
+	
+	return string(dest)
+}
+
+func decodeBase64String(b64 string) string {
+	var dest []byte; 
+	encoding := base64.NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+	dest = make([]byte, encoding.DecodedLen(len(b64))); 
+	encoding.Decode(dest, []byte(b64))
+
+	return string(dest)
+}
+
 
 func encodeSMTPAuthPlain(user string, password string) []byte {
 	var dest []byte
