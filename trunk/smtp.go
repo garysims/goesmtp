@@ -28,6 +28,7 @@ import (
 "regexp"
 "bytes"
 "strings"
+"time"
 )
 
 type SMTPStruct struct {
@@ -169,8 +170,8 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 			break
 		} else {
 			lineofbytes = TrimCRLF(lineofbytes)
+fmt.Println(string(lineofbytes))
 			lineofbytesL := bytes.ToLower(lineofbytes)
-			
 			mySMTP.logger.Log(LMAX, string(lineofbytes))
 			
 			if len(lineofbytes) > 0 {
@@ -192,8 +193,8 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 						ehlodomain = string(getDomainFromHELO(lineofbytes))
 						ehlor := fmt.Sprintf("250-%s\r\n", hostname)
 						con.Write([]byte(ehlor))
-						con.Write([]byte("250-AUTH=PLAIN\r\n"))
-						con.Write([]byte("250 AUTH PLAIN\r\n"))
+						con.Write([]byte("250-AUTH=PLAIN CRAM-MD5\r\n"))
+						con.Write([]byte("250 AUTH PLAIN CRAM-MD5\r\n"))
 						// HELO / EHLO is also like a RSET
 						rcptsi = 0
 						mailfrom = ""
@@ -273,23 +274,75 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 						break;
 					case authCmd.Match(lineofbytesL):
 						f := strings.Split(string(lineofbytes), " ", 0)
-						if(len(f)!=3) {
-							con.Write([]byte("504 Unrecognized authentication type.\r\n"))
+						if(len(f)<2) {
+							con.Write([]byte("504 Unrecognized authentication.\r\n"))
 						} else {
 							authtype := strings.ToLower(f[1])
-							if(authtype!="plain") {
-								con.Write([]byte("504 Unrecognized authentication type.\r\n"))
-							} else {
-								_, u1, p := decodeSMTPAuthPlain(f[2])
-								ourpassword, _ := getPasswordInfo(u1)
-								if(len(ourpassword)>0) && (ourpassword == p) {
-									con.Write([]byte("235 Authentication successful.\r\n"))
-									authenticated = true
+							if(authtype=="plain") {
+								// The client can either give the authenication string here or in
+								// the next command
+								if(len(f)==2) {
+									con.Write([]byte("334 \r\n"))
+										lineofbytes, err := buf.ReadBytes('\n');
+										if err != nil {
+											con.Close()
+											disconnected = true;
+											break
+										} else {
+											lineofbytes = TrimCRLF(lineofbytes)
+											_, u1, p := decodeSMTPAuthPlain(string(lineofbytes))
+											ourpassword, _ := getPasswordInfo(u1)
+											if(len(ourpassword)>0) && (ourpassword == p) {
+												con.Write([]byte("235 Authentication successful.\r\n"))
+												authenticated = true
+											} else {
+												con.Write([]byte("535 Authentication failed.\r\n"))
+												authenticated = false
+											}
+										}
 								} else {
-									con.Write([]byte("535 Authentication failed.\r\n"))
-									authenticated = false
-								}								
-							}							
+									_, u1, p := decodeSMTPAuthPlain(f[2])
+									ourpassword, _ := getPasswordInfo(u1)
+									if(len(ourpassword)>0) && (ourpassword == p) {
+										con.Write([]byte("235 Authentication successful.\r\n"))
+										authenticated = true
+									} else {
+										con.Write([]byte("535 Authentication failed.\r\n"))
+										authenticated = false
+									}		
+								}
+							} else if(authtype=="cram-md5") {
+								h, _ := os.Hostname()
+								cram1 := fmt.Sprintf("<%d.%d@%s>",os.Getpid(), time.Seconds(), h)
+								cram2 := fmt.Sprintf("334 %s\r\n", encodeBase64String(cram1))
+								con.Write([]byte(cram2))
+								lineofbytes, err := buf.ReadBytes('\n');
+								if err != nil {
+									con.Close()
+									disconnected = true;
+									break
+								} else {
+									lineofbytes = TrimCRLF(lineofbytes)
+									cram3 := decodeBase64String(string(lineofbytes))
+									cram3 = string(TrimCRLF([]byte(cram3)))
+									f := strings.Split(cram3, " " , 0)
+									if(len(f)!=2) {
+										con.Write([]byte("535 Authentication failed.\r\n"))
+										authenticated = false
+									} else {
+										ourpassword, _ := getPasswordInfo(f[0])
+										if((len(ourpassword)>0) && (keyedMD5(ourpassword, cram1) == f[1])) {
+											con.Write([]byte("235 Authentication successful.\r\n"))
+											authenticated = true
+										} else {
+											con.Write([]byte("535 Authentication failed.\r\n"))
+											authenticated = false
+										}
+									}
+								}
+							} else {
+								con.Write([]byte("504 Unrecognized authentication type.\r\n"))							
+							}
 						}
 						break;
 					default:
