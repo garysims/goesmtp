@@ -170,7 +170,6 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 			break
 		} else {
 			lineofbytes = TrimCRLF(lineofbytes)
-fmt.Println(string(lineofbytes))
 			lineofbytesL := bytes.ToLower(lineofbytes)
 			mySMTP.logger.Log(LMAX, string(lineofbytes))
 			
