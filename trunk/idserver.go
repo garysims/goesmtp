@@ -33,7 +33,7 @@ var G_idServerLock sync.Mutex
 var G_id uint64
 
 func createNewIDFile() {
-	fd, err := os.Open("id.txt", os.O_WRONLY | os.O_TRUNC | os.O_CREATE, 0666)
+	fd, err := os.Open(IDFILE, os.O_WRONLY | os.O_TRUNC | os.O_CREATE, 0666)
 	if(err == nil) {
 		ids := fmt.Sprintf("1\n")
 		fd.Write([]byte(ids))
@@ -47,7 +47,7 @@ func createNewIDFile() {
 
 func updateIDFile(id uint64) {
 	G_idServerLock.Lock()
-	fd, err := os.Open("id.txt", os.O_WRONLY | os.O_TRUNC, 0666)
+	fd, err := os.Open(IDFILE, os.O_WRONLY | os.O_TRUNC, 0666)
 	if(err == nil) {
 		ids := fmt.Sprintf("%d\n", id)
 		fd.Write([]byte(ids))
@@ -61,13 +61,12 @@ func updateIDFile(id uint64) {
 func getIDFromIDFile() (uint64, os.Error) {
 	G_idServerLock.Lock()
 	defer G_idServerLock.Unlock()
-	fd, err := os.Open("id.txt", os.O_RDONLY, 0666)
+	fd, err := os.Open(IDFILE, os.O_RDONLY, 0666)
 	if(err == nil) {
 		buf := bufio.NewReader(fd);
 		lineofbytes, errb := buf.ReadBytes('\n');
 		if(errb == nil) {
 			lineofbytes = TrimCRLF(lineofbytes)
-			fmt.Printf("getIDFromIDFile: %s\n", string(lineofbytes))
 			fd.Close()
 			return strconv.Atoui64(string(lineofbytes))
 		} else {
@@ -75,7 +74,7 @@ func getIDFromIDFile() (uint64, os.Error) {
 		}
 	} else {
 		// Error reading file, does it exist?
-		stat, _ := os.Stat("id.txt")
+		stat, _ := os.Stat(IDFILE)
 		if(stat == nil) {
 			// File doesn't exist
 			fmt.Println("id.txt doesn't exist... Create one...")
@@ -113,7 +112,6 @@ func handleIDServerReq (con *net.TCPConn) {
 }
 
 func startIDServer() {
-	print("ID Server starting...\n")
 	var err os.Error
 	
 	G_id, err = getIDFromIDFile()

@@ -53,7 +53,7 @@ func NewPOP3() (myPOP3 *POP3Struct) {
 	
 	myPOP3.logger.Log(LMIN, "Starting...")
 	
-	c, err := ReadConfigFile("config.cfg");
+	c, err := ReadConfigFile(CONFIGFILE);
 	if(err==nil) {
 		myPOP3.DBusername, _ = c.GetString("db", "username");
 		myPOP3.DBpassword, _ = c.GetString("db", "password");
@@ -468,7 +468,6 @@ func (myPOP3 *POP3Struct) handleConnection(con *net.TCPConn) {
 	{
 		lineofbytes, err := buf.ReadBytes('\n');
 		if err != nil {
-			print("Client disconnected rudely\n");
 			con.Close()
 			disconnected = true;
 			break
@@ -485,7 +484,6 @@ func (myPOP3 *POP3Struct) handleConnection(con *net.TCPConn) {
 						}
 						con.Write([]byte("+OK Bye for now\r\n"))
 						con.Close();
-						print("Client disconnected nicely\n");
 						disconnected = true;
 						break;
 					case apopCmd.Match(lineofbytesU):

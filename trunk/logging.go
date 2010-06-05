@@ -22,7 +22,7 @@ package main
 
 import (
 "log"
-"os"
+"sync"
 )
 
 const LOFF = 0
@@ -31,6 +31,8 @@ const LMIN = 2
 const LMED = 3
 const LMAX = 4
 const LCRAZY = 5
+
+var G_loggerLock sync.Mutex
 
 type LogStruct struct {
 	Logging         bool
@@ -54,7 +56,7 @@ func NewLogger(p string, level int) (mylog *LogStruct) {
         		mylog.Flags = 0
         		break;
         	case LERRORSONLY:
-        		mylog.Flags = log.Ltime
+        		mylog.Flags = log.Ldate | log.Ltime
         		break;
         	case LMIN:
         		mylog.Flags = log.Ltime
@@ -63,17 +65,21 @@ func NewLogger(p string, level int) (mylog *LogStruct) {
         		mylog.Flags = log.Ltime
         		break;
         	case LMAX:
-        		mylog.Flags = log.Ldate | log.Ltime
+        		mylog.Flags = log.Ltime
         		break;
         	case LCRAZY:
         		mylog.Flags = log.Ldate | log.Ltime
         		break;
         }
-        mylog.L = log.New(os.Stdout, nil, p, mylog.Flags)
+
+       	mylog.L = log.New(G_logFileFile, G_logFileFile2, p, mylog.Flags)
         return
 }
 
 func (mylog *LogStruct) Log(l int, s string) {
+	G_loggerLock.Lock()
+	defer G_loggerLock.Unlock()
+
 	if(mylog.Logging) {
 		if(l <= mylog.Level) {
 			mylog.L.Log(s)
@@ -82,6 +88,9 @@ func (mylog *LogStruct) Log(l int, s string) {
 }
 
 func (mylog *LogStruct) Logf(l int, format string, v ...interface{}) {
+	G_loggerLock.Lock()
+	defer G_loggerLock.Unlock()
+
 	if(mylog.Logging) {
 		if(l <= mylog.Level) {
 			mylog.L.Logf(format, v)

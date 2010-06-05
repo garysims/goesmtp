@@ -51,7 +51,7 @@ func NewDHTForceSync() (myDHTForceSync *DHTForceSyncStruct) {
 	
 	myDHTForceSync.logger.Log(LMIN, "Starting...")
 	
-	c, err := ReadConfigFile("config.cfg");
+	c, err := ReadConfigFile(CONFIGFILE);
 	if(err==nil) {
 		myDHTForceSync.DBusername, _ = c.GetString("db", "username");
 		myDHTForceSync.DBpassword, _ = c.GetString("db", "password");

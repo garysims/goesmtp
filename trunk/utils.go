@@ -171,9 +171,9 @@ func createWorkingDirs() {
     15 : "f",
 }
 	
-	os.Mkdir(INQUEUEDIR, perms)
-	os.Mkdir(OUTQUEUEDIR, perms)
-	os.Mkdir(MESSAGESTOREDIR, perms)
+	os.MkdirAll(INQUEUEDIR, perms)
+	os.MkdirAll(OUTQUEUEDIR, perms)
+	os.MkdirAll(MESSAGESTOREDIR, perms)
 	
 	d1 := 0
 	d2 := 0
@@ -481,7 +481,7 @@ func getInput() string {
 func truncateAllTables () {
 
 
-	c, err := ReadConfigFile("config.cfg");
+	c, err := ReadConfigFile(CONFIGFILE);
 	if(err!=nil) {
 			fmt.Printf("Can't read config file\n")
 			os.Exit(-1)
