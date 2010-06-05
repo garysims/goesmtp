@@ -86,7 +86,7 @@ func (myRouter *routerStruct) addPasswordToList(username string, password string
 }
 
 func (myRouter *routerStruct) readPasswords() {
-	fd, err := os.Open("passwords.txt", os.O_RDONLY, 0666)
+	fd, err := os.Open(PASSWORDFILE, os.O_RDONLY, 0666)
 	if(err == nil) {
 		buf := bufio.NewReader(fd);
 		for {
@@ -168,7 +168,7 @@ func NewRouter() (myRouter *routerStruct) {
 	
 	myRouter.logger.Log(LMIN, "Starting...")
 	
-	c, err := ReadConfigFile("config.cfg");
+	c, err := ReadConfigFile(CONFIGFILE);
 	if(err==nil) {
 		myRouter.DBusername, _ = c.GetString("db", "username");
 		myRouter.DBpassword, _ = c.GetString("db", "password");
@@ -184,7 +184,7 @@ func NewRouter() (myRouter *routerStruct) {
 func (myRouter *routerStruct) updateNewMessageLog(sha1 string, sz int64, mailbox string) bool {
 
 	id := getIDFromIDServer()
-	sql := fmt.Sprintf("INSERT INTO goesmtp.newMessageLog (id, sha1, mailbox, size) VALUES ('%s', '%s', '%s', '%d')", id, sha1, mailbox, sz)
+	sql := fmt.Sprintf("INSERT INTO newMessageLog (id, sha1, mailbox, size) VALUES ('%s', '%s', '%s', '%d')", id, sha1, mailbox, sz)
 	myRouter.logger.Logf(LMAX, "updateNewMessageLog SQL: %s", sql)
 
 	myRouter.db.Query(sql)

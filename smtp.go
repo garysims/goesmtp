@@ -44,7 +44,7 @@ func NewSMTP() (mySMTP *SMTPStruct) {
 	
 	mySMTP.logger.Log(LMIN, "Starting...")
 	
-	c, err := ReadConfigFile("config.cfg");
+	c, err := ReadConfigFile(CONFIGFILE);
 	if(err==nil) {
 		mySMTP.domains, _ = c.GetString("smtp", "domains");
 	}
@@ -100,8 +100,6 @@ func (mySMTP *SMTPStruct) recvBodyToFile(con *net.TCPConn, hostname string, helo
 	fd, err := os.Open(fn, os.O_CREATE | os.O_RDWR, 0666)
 
 	if (err == nil) {
-
-//		addOurReceivedField(fd, hostname, helo, ehlo, msgFilename)
 
 		buf := bufio.NewReader(con);
 		for {

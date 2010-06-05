@@ -427,7 +427,7 @@ func NewDHTServer() (myDHTServer *DHTServerStruct) {
 	
 	myDHTServer.logger.Log(LMIN, "Starting...")
 	
-	c, err := ReadConfigFile("config.cfg");
+	c, err := ReadConfigFile(CONFIGFILE);
 	if(err==nil) {
 		myDHTServer.DBusername, _ = c.GetString("db", "username");
 		myDHTServer.DBpassword, _ = c.GetString("db", "password");
@@ -789,7 +789,6 @@ func (myDHTServer *DHTServerStruct) handleConnection(con *net.TCPConn) {
 	buf := bufio.NewReader(con);
 	lineofbytes, err := buf.ReadBytes('\n');
 	if err != nil {
-		print("Client disconnected rudely\n");
 		con.Close()
 		return
 	} else {

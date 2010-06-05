@@ -28,10 +28,13 @@ import (
 )
 
 const MAXRCPT = 100
-const INQUEUEDIR = "./in"
-const OUTQUEUEDIR = "./out"
-const MESSAGESTOREDIR = "./messagestore"
-const VERSION = "V0.1"
+const INQUEUEDIR = "/var/spool/goesmtp/in"
+const OUTQUEUEDIR = "/var/spool/goesmtp/out"
+const MESSAGESTOREDIR = "/var/spool/goesmtp/messagestore"
+const PASSWORDFILE = "/var/spool/goesmtp/passwords.txt"
+const IDFILE = "/var/spool/goesmtp/id.txt"
+const CONFIGFILE = "/etc/goesmtp.cfg"
+const VERSION = "V0.1r39"
 
 var G_masterNode string
 var G_nodeType string
@@ -39,13 +42,84 @@ var G_nodeID string
 var G_IPAddress string
 var G_domainOverride string = ""
 var G_clusterKey string
+var G_logFileFile *os.File
+var G_logFileFile2 *os.File = nil
 
 const G_LoggingLevel = LMIN
 
 func main() {
-	fmt.Printf("goESMTP %s starting...\n", VERSION)
+		
+	//
+	// Command line actions
+	//
+	logFileValue := ""
+	flag.StringVar(&logFileValue, "f", "", "Log filename")
+	cFlag := flag.Bool("c", false, "Log to console")
+	
+	flag.Parse()   // Scans the arg list and sets up flags
+	if(len(logFileValue)>0) {
+		fmt.Printf("log: %s\n", logFileValue)
+	} else {
+		if flag.NArg() != 0 {
+			for i := 0; i < flag.NArg(); i++ {
+				if(flag.Arg(i) == "forcesync") {
+					NewDHTForceSync()
+				} else if(flag.Arg(i) == "purge") {
+					fmt.Println("Delete all the messages and reset the DB. Are you sure? [y/n]")
+					yorn := getInput()
+					if((yorn=="Y") || (yorn=="y")) {
+						fmt.Println("Are you really, really sure? [y/n]")
+						yorn = getInput()
+						if((yorn=="Y") || (yorn=="y")) {
+							// Purge the message store
+							purgeMessageStore()
+							truncateAllTables()
+							updateIDFile(1)
+						}
+					}
+				} else if(flag.Arg(i) == "quickpurge") {
+					fmt.Println("Delete all the messages from the DB. Are you sure? [y/n]")
+					yorn := getInput()
+					if((yorn=="Y") || (yorn=="y")) {
+						fmt.Println("Are you really, really sure? [y/n]")
+						yorn = getInput()
+						if((yorn=="Y") || (yorn=="y")) {
+							// Purge the DB but not the message store
+							truncateAllTables()
+							updateIDFile(1)
+						}
+					}
+				} else if(flag.Arg(i) == "createdirs") {
+					createWorkingDirs()
+				}
+			}
+			os.Exit(0)
+		}
+	}
 
-	c, err := ReadConfigFile("config.cfg");
+	//
+	// Setup logging
+	//
+	
+	os.MkdirAll("/var/log/goesmtp", 0766)
+	
+	lfn := fmt.Sprintf("/var/log/goesmtp/%s.%d.log",time.LocalTime().Format("20060102.1504"),os.Getpid())
+	var err os.Error
+	G_logFileFile, err = os.Open(lfn, os.O_CREATE | os.O_RDWR, 0666)
+	if (err != nil) {
+		G_logFileFile = os.Stdout
+	}
+	if *cFlag {
+		G_logFileFile2 = os.Stdout
+	}
+	
+	banner := fmt.Sprintf("GoESMTP %s starting %s\n", VERSION, time.LocalTime().Format("Mon, 02 Jan 2006 15:04:05 -0700"))
+	G_logFileFile.WriteString(banner)
+	if(G_logFileFile2 != nil) {
+		G_logFileFile2.WriteString(banner)
+	}
+
+	c, err := ReadConfigFile(CONFIGFILE);
 	if(err==nil) {
 		// Need to check the presence of these variables
 		// otherwise exit
@@ -59,47 +133,6 @@ func main() {
 		print("Error reading configuation file.\n");
 	}
 	
-	//
-	// Command line actions
-	//
-	
-	flag.Parse()   // Scans the arg list and sets up flags
-	if flag.NArg() != 0 {
-        for i := 0; i < flag.NArg(); i++ {
-			if(flag.Arg(i) == "forcesync") {
-				NewDHTForceSync()
-			} else if(flag.Arg(i) == "purge") {
-				fmt.Println("Delete all the messages and reset the DB. Are you sure? [y/n]")
-				yorn := getInput()
-				if((yorn=="Y") || (yorn=="y")) {
-					fmt.Println("Are you really, really sure? [y/n]")
-					yorn = getInput()
-					if((yorn=="Y") || (yorn=="y")) {
-						// Purge the message store
-						purgeMessageStore()
-						truncateAllTables()
-						updateIDFile(1)
-					}
-				}
-			} else if(flag.Arg(i) == "quickpurge") {
-				fmt.Println("Delete all the messages from the DB. Are you sure? [y/n]")
-				yorn := getInput()
-				if((yorn=="Y") || (yorn=="y")) {
-					fmt.Println("Are you really, really sure? [y/n]")
-					yorn = getInput()
-					if((yorn=="Y") || (yorn=="y")) {
-						// Purge the DB but not the message store
-						truncateAllTables()
-						updateIDFile(1)
-					}
-				}
-			} else if(flag.Arg(i) == "createdirs") {
-				createWorkingDirs()
-			}
-        }
-		os.Exit(0)
-	}
-
 	if(checkWorkingDirs()==false) {
 		fmt.Printf("There seems to be a problem with the working directory structure. Do you need to run 'goesmtp createdirs'?\n")
 		os.Exit(-1)
