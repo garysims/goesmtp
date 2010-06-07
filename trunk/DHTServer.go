@@ -135,7 +135,13 @@ func (myDHTServer *DHTServerStruct) processRemoteNewMessageLog() {
 						return
 					}
 
-					myDHTServer.updateNewMessageCounter(iid, fields[4])					
+					inode, inerr := strconv.Atoi64(fields[4])
+					if(inerr!=nil) {
+						myDHTServer.logger.Log(LMIN, "Unexpected Atoi conversion")	
+						return
+					}
+
+					setCounter(NEWMESSAGECOUNTERFILE, inode, uint64(iid))
 					rowsreceived++
 				}
 			}
@@ -180,93 +186,42 @@ func (myDHTServer *DHTServerStruct) processNewMessageLog() int{
 				fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
 		}
 		
-		// Update the counters	
-		myDHTServer.updateNewMessageCounter(row["id"].(int64), G_nodeID)
+		// Update the counters
+		
+		// This is bad converting from string to int all the time
+		inode, inerr := strconv.Atoi64(G_nodeID)
+		if(inerr!=nil) {
+			myDHTServer.logger.Log(LMIN, "Unexpected Atoi conversion")	
+			return 0
+		}
+
+		setCounter(NEWMESSAGECOUNTERFILE, inode, uint64(row["id"].(int64)))
 		count += 1
 	}
 
 	return count
 }
 
-func (myDHTServer *DHTServerStruct) updateNewMessageCounter(id int64, nodeid string) {
-		sql := fmt.Sprintf("INSERT INTO newMessageCounter (id, nodeid) VALUES ('%d', '%s')", id, nodeid)
-		myDHTServer.logger.Logf(LMAX, "updateNewMessageCounter SQL: %s", sql)
-
-		myDHTServer.db.Query(sql)
-		if myDHTServer.db.Errno != 0 {
-				fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
-		}
-
-		sql = fmt.Sprintf("DELETE FROM newMessageCounter WHERE ID < '%d' and nodeid = '%s'", id, nodeid)
-		myDHTServer.logger.Logf(LMAX, "updateNewMessageCounter SQL: %s", sql)
-
-		myDHTServer.db.Query(sql)
-		if myDHTServer.db.Errno != 0 {
-				fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
-		}
-}
-
 func (myDHTServer *DHTServerStruct) getHighestIDForNodeFromDHT(node string) int64 {
-	sql := fmt.Sprintf("SELECT max(id) FROM newMessageCounter WHERE nodeid = %s", node)
-	res, mysqlerr := myDHTServer.db.Query(sql)
-	if mysqlerr != nil {
-		fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
-		return -1
-	} else {
-		// Results
-		var row map[string] interface { }
-		for {
-			row = res.FetchMap()
-			if row == nil {
-				break
-			}
-			
-			return  row["max(id)"].(int64)
-		}
+	// This is bad converting from string to int all the time
+	inode, inerr := strconv.Atoi64(node)
+	if(inerr!=nil) {
+		myDHTServer.logger.Log(LMIN, "Unexpected Atoi conversion")	
+		return 1
 	}
-	
-	return 1
-}
 
-
-func (myDHTServer *DHTServerStruct) updateDelMessageCounter(id int64, nodeid string) {
-		sql := fmt.Sprintf("INSERT INTO delMessageCounter (id, nodeid) VALUES ('%d', '%s')", id, nodeid)
-		myDHTServer.logger.Logf(LMAX, "updateDelMessageCounter SQL: %s", sql)
-
-		myDHTServer.db.Query(sql)
-		if myDHTServer.db.Errno != 0 {
-				fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
-		}
-
-		sql = fmt.Sprintf("DELETE FROM delMessageCounter WHERE ID < '%d' and nodeid = '%s'", id, nodeid)
-		myDHTServer.logger.Logf(LMAX, "updateDelMessageCounter SQL: %s", sql)
-
-		myDHTServer.db.Query(sql)
-		if myDHTServer.db.Errno != 0 {
-				fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
-		}
+	return int64(getCounter(NEWMESSAGECOUNTERFILE, inode))
 }
 
 func (myDHTServer *DHTServerStruct) getHighestIDFordelMessageLog(node string) int64 {
-	sql := fmt.Sprintf("SELECT max(id) FROM delMessageCounter WHERE nodeid = %s", node)
-	res, mysqlerr := myDHTServer.db.Query(sql)
-	if mysqlerr != nil {
-		fmt.Printf("Error #%d %s\n", myDHTServer.db.Errno, myDHTServer.db.Error)
-		return -1
-	} else {
-		// Results
-		var row map[string] interface { }
-		for {
-			row = res.FetchMap()
-			if row == nil {
-				break
-			}
-			
-			return  row["max(id)"].(int64)
-		}
+	// This is bad converting from string to int all the time
+	inode, inerr := strconv.Atoi64(node)
+	if(inerr!=nil) {
+		myDHTServer.logger.Log(LMIN, "Unexpected Atoi conversion")	
+		return 1
 	}
-	
-	return 1
+
+	return int64(getCounter(DELMESSAGECOUNTERFILE, inode))
 }
 
 func (myDHTServer *DHTServerStruct) processRemoteDelMessageLog() {
@@ -357,7 +312,13 @@ func (myDHTServer *DHTServerStruct) processRemoteDelMessageLog() {
 						return
 					}
 
-					myDHTServer.updateDelMessageCounter(iid, fields[3])					
+					inode, inerr := strconv.Atoi64(fields[3])
+					if(inerr!=nil) {
+						myDHTServer.logger.Log(LMIN, "Unexpected Atoi conversion")	
+						return
+					}
+
+					setCounter(DELMESSAGECOUNTERFILE, inode, uint64(iid))
 					rowsreceived++
 				}
 			}
@@ -402,7 +363,15 @@ func (myDHTServer *DHTServerStruct) processDelMessageLog() int{
 		}
 		
 		// Update the counters	
-		myDHTServer.updateDelMessageCounter(row["id"].(int64), G_nodeID)
+
+		// This is bad converting from string to int all the time
+		inode, inerr := strconv.Atoi64(G_nodeID)
+		if(inerr!=nil) {
+			myDHTServer.logger.Log(LMIN, "Unexpected Atoi conversion")	
+			return 0
+		}
+
+		setCounter(DELMESSAGECOUNTERFILE, inode, uint64(row["id"].(int64)))
 		
 		// Delete the from the message store
 		// Just try to delete the file as if we have a copy (original or cached) it needs to
