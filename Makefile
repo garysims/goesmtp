@@ -38,6 +38,7 @@ GOFILES=\
 		parse.go \
 		ip.go \
 		pop3.go \
+		messagecounter.go \
         main.go \
 
 include $(GOROOT)/src/Make.cmd
