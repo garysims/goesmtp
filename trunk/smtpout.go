@@ -82,6 +82,11 @@ func (mySMTPOut *smtpOutStruct) getAndCheckResp(buf *bufio.Reader, code string) 
 
 func (mySMTPOut *smtpOutStruct) createNDN(sender string, failedrcptto string, origfn822 string, reason string) bool {
 
+	if(len(sender)==0) {
+		mySMTPOut.logger.Logf(LMIN, "NULL return path for NDN for failed recipient %s", failedrcptto)
+		return true
+	}
+	
 	ndn821 := fmt.Sprintf("%s/NDN-%s1.tmp", INQUEUEDIR, origfn822[0:len(origfn822)-1])
 	ndn822 := fmt.Sprintf("%s/NDN-%s.tmp", INQUEUEDIR, origfn822)
 

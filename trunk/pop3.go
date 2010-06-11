@@ -26,23 +26,21 @@ import (
 "net"
 "os"
 "fmt"
-"mysql"
 "bufio"
 "regexp"
 "bytes"
 "strings"
 "strconv"
 "time"
+"gosqlite.googlecode.com/hg/sqlite"
 )
 
 
 type POP3Struct struct {
 	logger *LogStruct
-	DBusername string
-	DBpassword string
-	DBhost string
-	DBdatabase string
-	db *mysql.MySQL
+	dht *sqlite.Conn
+	nml *sqlite.Conn
+	dml *sqlite.Conn
 }
 
 func NewPOP3() (myPOP3 *POP3Struct) {
@@ -52,15 +50,7 @@ func NewPOP3() (myPOP3 *POP3Struct) {
 	myPOP3.logger = NewLogger("POP3 ", G_LoggingLevel)
 	
 	myPOP3.logger.Log(LMIN, "Starting...")
-	
-	c, err := ReadConfigFile(CONFIGFILE);
-	if(err==nil) {
-		myPOP3.DBusername, _ = c.GetString("db", "username");
-		myPOP3.DBpassword, _ = c.GetString("db", "password");
-		myPOP3.DBhost, _ = c.GetString("db", "host");
-		myPOP3.DBdatabase, _ = c.GetString("db", "database");
-	}
-	
+		
 	myPOP3.connectToDB()
  
  	return
@@ -68,15 +58,24 @@ func NewPOP3() (myPOP3 *POP3Struct) {
 
 
 func (myPOP3 *POP3Struct) connectToDB() {
-	// Create new instance
-	myPOP3.db = mysql.New()
-	// Enable/Disable logging
-	myPOP3.db.Logging = false
-	// Connect to database
-	myPOP3.db.Connect(myPOP3.DBhost, myPOP3.DBusername, myPOP3.DBpassword, myPOP3.DBdatabase)
-	if myPOP3.db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
-			os.Exit(1)
+	var err os.Error
+	
+	myPOP3.dht, err = sqlite.Open("/var/spool/goesmtp/DHT.db")
+	if(err!=nil) {
+		myPOP3.logger.Logf(LMIN, "Can't open the DHT database. FATAL: %s\n", err)
+		os.Exit(-1)
+	}
+
+	myPOP3.nml, err = sqlite.Open("/var/spool/goesmtp/newMessageLog.db")
+	if(err!=nil) {
+		myPOP3.logger.Logf(LMIN, "Can't open the newMessageLog database. FATAL: %s\n", err)
+		os.Exit(-1)
+	}
+
+	myPOP3.dml, err = sqlite.Open("/var/spool/goesmtp/delMessageLog.db")
+	if(err!=nil) {
+		myPOP3.logger.Logf(LMIN, "Can't open the delMessageLog database. FATAL: %s\n", err)
+		os.Exit(-1)
 	}
 }
 
@@ -90,23 +89,28 @@ func (myPOP3 *POP3Struct) doListAll(con *net.TCPConn, user string) {
 	
 	// Query DHT
 	sql := fmt.Sprintf("SELECT id, size from DHT where mailbox='%s' order by id;", user)
-	res, mysqlerr := myPOP3.db.Query(sql)
-	if mysqlerr != nil {
-		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
-		os.Exit(1)
-	}
+	G_dhtDBLock.Lock()
+	stmt, serr := myPOP3.dht.Prepare(sql)
+	defer stmt.Finalize()
+	defer G_dhtDBLock.Unlock()
+	if(serr == nil) {
+		stmt.Exec()
 
-    // Process results
-	var row map[string] interface{}
-	i := 1
-	for {
-		row = res.FetchMap()
-		if row == nil {
-				break
+		var id int
+		var size int
+		i := 1	
+		for stmt.Next() {
+        	err := stmt.Scan(&id, &size)
+        	if(err != nil) {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB: %s", err)	
+        		break
+        	}
+			con.Write([]byte(fmt.Sprintf("%d %d\r\n", i, size)))				
+			i = i + 1        	
 		}
-		szmsg := row["size"].(int)
-		con.Write([]byte(fmt.Sprintf("%d %d\r\n", i, szmsg)))				
-		i = i + 1
+		
+	} else {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB (%s): %s", sql, serr)
 	}
 	con.Write([]byte(".\r\n"))	
 }
@@ -121,28 +125,27 @@ func (myPOP3 *POP3Struct) doListN(con *net.TCPConn, user string, msgnumstr strin
 	
 	// Query DHT
 	sql := fmt.Sprintf("SELECT id, size from DHT where mailbox='%s' order by id limit %d, 1;", user, msgnum - 1)
-	res, mysqlerr := myPOP3.db.Query(sql)
-	if mysqlerr != nil {
-		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
-		os.Exit(1)
-	}
+	G_dhtDBLock.Lock()
+	stmt, serr := myPOP3.dht.Prepare(sql)
+	defer stmt.Finalize()
+	defer G_dhtDBLock.Unlock()
+	if(serr == nil) {
+		stmt.Exec()
 
-//	i := 1
-    // Process results
-	var row map[string] interface{}
-	for {
-		row = res.FetchMap()
-		if row == nil {
-				break
-		}
-//		if(i==msgnum) {
-			szmsg := row["size"].(int)
-			con.Write([]byte(fmt.Sprintf("+OK %d %d\r\n", msgnum, szmsg)))				
+		var id int
+		var size int
+		for stmt.Next() {
+        	err := stmt.Scan(&id, &size)
+        	if(err != nil) {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB: %s", err)	
+        		break
+        	}
+        	
+			con.Write([]byte(fmt.Sprintf("+OK %d %d\r\n", msgnum, size)))				
 			return
-//		}
-//		i = i + 1
-	}
-	con.Write([]byte("-ERR no such message\r\n"))
+		}
+		con.Write([]byte("-ERR no such message\r\n"))
+	}        	
 }
 
 func (myPOP3 *POP3Struct) doList(con *net.TCPConn, user string, msgnum string) {
@@ -159,25 +162,27 @@ func (myPOP3 *POP3Struct) doUIDLAll(con *net.TCPConn, user string) {
 	
 	// Query DHT
 	sql := fmt.Sprintf("SELECT id, sha1 from DHT where mailbox='%s' order by id;", user)
-	res, mysqlerr := myPOP3.db.Query(sql)
-	if mysqlerr != nil {
-		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
-		os.Exit(1)
-	}
+	G_dhtDBLock.Lock()
+	stmt, serr := myPOP3.dht.Prepare(sql)
+	defer stmt.Finalize()
+	defer G_dhtDBLock.Unlock()
+	if(serr == nil) {
+		stmt.Exec()
 
-    // Process results
-	var row map[string] interface{}
-	i := 1
-	for {
-		row = res.FetchMap()
-		if row == nil {
-				break
+		var id int
+		var sha string
+		i := 1
+		for stmt.Next() {
+        	err := stmt.Scan(&id, &sha)
+        	if(err != nil) {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB: %s", err)	
+        		break
+        	}
+			con.Write([]byte(fmt.Sprintf("%d %s\r\n", i, sha)))				
+			i = i + 1
 		}
-		sha := row["sha1"].(string)
-		con.Write([]byte(fmt.Sprintf("%d %s\r\n", i, sha)))				
-		i = i + 1
 	}
-	con.Write([]byte(".\r\n"))
+	con.Write([]byte(".\r\n"))	
 }
 
 func (myPOP3 *POP3Struct) doUIDLN(con *net.TCPConn, user string, msgnumstr string) {
@@ -190,26 +195,24 @@ func (myPOP3 *POP3Struct) doUIDLN(con *net.TCPConn, user string, msgnumstr strin
 	
 	// Query DHT
 	sql := fmt.Sprintf("SELECT id, sha1 from DHT where mailbox='%s' order by id limit %d, 1;", user, msgnum - 1)
-	res, mysqlerr := myPOP3.db.Query(sql)
-	if mysqlerr != nil {
-		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
-		os.Exit(1)
-	}
+	G_dhtDBLock.Lock()
+	stmt, serr := myPOP3.dht.Prepare(sql)
+	defer stmt.Finalize()
+	defer G_dhtDBLock.Unlock()
+	if(serr == nil) {
+		stmt.Exec()
 
-//	i := 1
-    // Process results
-	var row map[string] interface{}
-	for {
-		row = res.FetchMap()
-		if row == nil {
-				break
-		}
-//		if(i==msgnum) {
-			sha := row["sha1"].(string)
+		var id int
+		var sha string
+		for stmt.Next() {
+        	err := stmt.Scan(&id, &sha)
+        	if(err != nil) {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB: %s", err)	
+        		break
+        	}
 			con.Write([]byte(fmt.Sprintf("+OK %d %s\r\n", msgnum, sha)))				
 			return
-//		}
-//		i = i + 1
+		}
 	}
 	con.Write([]byte("-ERR no such message\r\n"))
 }
@@ -224,43 +227,34 @@ func (myPOP3 *POP3Struct) doUIDL(con *net.TCPConn, user string, msgnum string) {
 
 func (myPOP3 *POP3Struct) getStat(user string) (int64, int64) {
 	
-	var nummsgs int64
-	var szmsgs int64
-	nummsgs = -1
-	szmsgs = -1
+	var nummsgs int
+	var szmsgs int
+	nummsgs = 0
+	szmsgs = 0
 	
 	// Query DHT
-	sql := fmt.Sprintf("SELECT sum(size), count(id) from DHT where mailbox='%s';", user)
-	res, mysqlerr := myPOP3.db.Query(sql)
-	if mysqlerr != nil {
-		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
-		os.Exit(1)
-	}
+	sql := fmt.Sprintf("SELECT id, size from DHT where mailbox='%s';", user)
+	G_dhtDBLock.Lock()
+	stmt, serr := myPOP3.dht.Prepare(sql)
+	defer stmt.Finalize()
+	defer G_dhtDBLock.Unlock()
+	if(serr == nil) {
+		stmt.Exec()
 
-    // Process results
-	var row map[string] interface{}
-	for {
-		row = res.FetchMap()
-		if row == nil {
-				break
-		}
-		for key, value := range row {
-			if(key=="sum(size)") {
-				szmsgs, _ = strconv.Atoi64(value.(string))
-			}
-			if(key=="count(id)") {
-				nummsgs = value.(int64)
-			}
+		var id int
+		var size int
+		for stmt.Next() {
+        	err := stmt.Scan(&id, &size)
+        	if(err != nil) {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB: %s", err)	
+        		break
+        	}
+        	nummsgs++
+			szmsgs = szmsgs + size
 		}
 	}
 
-	if((nummsgs == -1) || (szmsgs == -1)) {
-		return 0, 0
-	} else {
-		return nummsgs, szmsgs
-	}
-	
-	return 0, 0
+	return int64(nummsgs), int64(szmsgs)
 }
 
 func (myPOP3 *POP3Struct) doRemoteRETR(con *net.TCPConn, sha1 string, orignodeid string) {
@@ -336,51 +330,57 @@ func (myPOP3 *POP3Struct) doRETR(con *net.TCPConn, user string, msgnumstr string
 	
 	// Query DHT
 	sql := fmt.Sprintf("SELECT id, sha1, orignodeid from DHT where mailbox='%s' order by id limit %d, 1;", user, msgnum - 1)
-	res, mysqlerr := myPOP3.db.Query(sql)
-	if mysqlerr != nil {
-		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
-	}
+	G_dhtDBLock.Lock()
+	stmt, serr := myPOP3.dht.Prepare(sql)
+	defer stmt.Finalize()
+	defer G_dhtDBLock.Unlock()
+	if(serr == nil) {
+		stmt.Exec()
 
-    // Process results
-	var row map[string] interface{}
-	for {
-		row = res.FetchMap()
-		if row == nil {
-				break
-		}
-		orignodeid := fmt.Sprintf("%d", row["orignodeid"].(int))
-		if(orignodeid != G_nodeID) {
-			// Need to get the message from another server in the cluster
-			myPOP3.logger.Logf(LMED, "Need to get the message from another server in the cluster: %s", orignodeid)
-			myPOP3.doRemoteRETR(con, row["sha1"].(string), orignodeid)
-			return
-		} else {
-			sha := row["sha1"].(string)
+		var id int
+		var sha1 string
+		var orignodeid string
+		for stmt.Next() {
+        	err := stmt.Scan(&id, &sha1, &orignodeid)
+        	if(err != nil) {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB: %s", err)	
+        		break
+        	}
 
-			fn := filename822AndPathFromSHA(sha)
 
-			body, errb := os.Open(fn, os.O_RDONLY, 0666)
-	
-			if (errb == nil) {
-				buf := bufio.NewReader(body);
-				con.Write([]byte("+OK message follows\r\n"))				
-				for {
-					lineofbytes, errl := buf.ReadBytes('\n');
-					if errl != nil {
-						body.Close()
-						break
-					} else {
-						con.Write(lineofbytes)
-					}
-				}
+			if(orignodeid != G_nodeID) {
+				// Need to get the message from another server in the cluster
+				myPOP3.logger.Logf(LMED, "Need to get the message from another server in the cluster: %s", orignodeid)
+				myPOP3.doRemoteRETR(con, sha1, orignodeid)
+				return
 			} else {
-				myPOP3.logger.Logf(LMIN, "doRETR - Can't open file: %s", fn)
+				fn := filename822AndPathFromSHA(sha1)
+	
+				body, errb := os.Open(fn, os.O_RDONLY, 0666)
+		
+				if (errb == nil) {
+					buf := bufio.NewReader(body);
+					con.Write([]byte("+OK message follows\r\n"))				
+					for {
+						lineofbytes, errl := buf.ReadBytes('\n');
+						if errl != nil {
+							body.Close()
+							break
+						} else {
+							con.Write(lineofbytes)
+						}
+					}
+				} else {
+					myPOP3.logger.Logf(LMIN, "doRETR - Can't open file: %s", fn)
+				}
+				con.Write([]byte(".\r\n"))
+				return
 			}
-			con.Write([]byte(".\r\n"))
-			return
 		}
+		con.Write([]byte("-ERR no such message\r\n"))
+	} else {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB (%s): %s", sql, serr)
 	}
-	con.Write([]byte("-ERR no such message\r\n"))
 }
 
 func (myPOP3 *POP3Struct) doDELE(con *net.TCPConn, user string, msgnumstr string, msgsToDel []int) []int {
@@ -402,15 +402,27 @@ func (myPOP3 *POP3Struct) doDELE(con *net.TCPConn, user string, msgnumstr string
 func (myPOP3 *POP3Struct) getSHAKeyForID(msgnum int, user string) string {
 	// Query DHT
 	sql := fmt.Sprintf("SELECT sha1 from DHT where mailbox='%s' order by id limit %d, 1;", user, msgnum - 1)
-	res, mysqlerr := myPOP3.db.Query(sql)
-	if mysqlerr != nil {
-		fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
-		return ""
-	}
+	G_dhtDBLock.Lock()
+	stmt, serr := myPOP3.dht.Prepare(sql)
+	defer stmt.Finalize()
+	defer G_dhtDBLock.Unlock()
+	if(serr == nil) {
+		stmt.Exec()
 
-	var row map[string] interface{}
-	row = res.FetchMap()
-	return row["sha1"].(string)
+		var sha1 string
+		for stmt.Next() {
+        	err := stmt.Scan(&sha1)
+        	if(err != nil) {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB: %s", err)	
+        		break
+        	}
+        	return sha1
+		}
+	} else {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB (%s): %s", sql, serr)
+	}
+	
+	return ""
 }
 
 func (myPOP3 *POP3Struct) reallyDoDELE(msgsToDel []int, user string) {
@@ -418,15 +430,15 @@ func (myPOP3 *POP3Struct) reallyDoDELE(msgsToDel []int, user string) {
 	for i:= 0 ; i < len(msgsToDel) ; i++ {
 		s := myPOP3.getSHAKeyForID(msgsToDel[i], user)
 		id := getIDFromIDServer()
-		sql := fmt.Sprintf("INSERT INTO delMessageLog (id, sha1, mailbox) VALUES ('%s', '%s', '%s')", id, s, user)
+		sql := fmt.Sprintf("INSERT INTO delMessageLog (id, sha1, mailbox) VALUES (%s, '%s', '%s')", id, s, user)
 		myPOP3.logger.Logf(LMAX, "reallyDoDELE SQL: %s", sql)
-
-		myPOP3.db.Query(sql)
-		if myPOP3.db.Errno != 0 {
-				fmt.Printf("Error #%d %s\n", myPOP3.db.Errno, myPOP3.db.Error)
-		}		
+		G_dmlDBLock.Lock()
+		serr := myPOP3.dml.Exec(sql)
+		G_dmlDBLock.Unlock()
+		if(serr!=nil) {
+			myPOP3.logger.Logf(LMIN, "Unexpected error using DB (%s): %s", sql, serr)
+		}
 	}
-
 }
 
 //

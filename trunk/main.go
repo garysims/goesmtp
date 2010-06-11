@@ -25,7 +25,10 @@ import (
 "flag"
 "os"
 "time"
+"sync"
 )
+
+const VERSION = "V0.1r42"
 
 const MAXRCPT = 100
 const INQUEUEDIR = "/var/spool/goesmtp/in"
@@ -36,7 +39,6 @@ const NEWMESSAGECOUNTERFILE = "/var/spool/goesmtp/newmessagecounter"
 const DELMESSAGECOUNTERFILE = "/var/spool/goesmtp/delmessagecounter"
 const IDFILE = "/var/spool/goesmtp/id.txt"
 const CONFIGFILE = "/etc/goesmtp.cfg"
-const VERSION = "V0.1r39"
 
 var G_masterNode string
 var G_nodeType string
@@ -46,6 +48,10 @@ var G_domainOverride string = ""
 var G_clusterKey string
 var G_logFileFile *os.File
 var G_logFileFile2 *os.File = nil
+
+var G_dhtDBLock sync.Mutex
+var G_nmlDBLock sync.Mutex
+var G_dmlDBLock sync.Mutex
 
 const G_LoggingLevel = LMIN
 
@@ -67,10 +73,10 @@ func main() {
 				if(flag.Arg(i) == "forcesync") {
 					NewDHTForceSync()
 				} else if(flag.Arg(i) == "purge") {
-					fmt.Println("Delete all the messages and reset the DB. Are you sure? [y/n]")
+					fmt.Print("Delete all the messages and reset the DB. Are you sure? [y/n] ")
 					yorn := getInput()
 					if((yorn=="Y") || (yorn=="y")) {
-						fmt.Println("Are you really, really sure? [y/n]")
+						fmt.Print("Are you really, really sure? [y/n] ")
 						yorn = getInput()
 						if((yorn=="Y") || (yorn=="y")) {
 							// Purge the message store
@@ -80,10 +86,10 @@ func main() {
 						}
 					}
 				} else if(flag.Arg(i) == "quickpurge") {
-					fmt.Println("Delete all the messages from the DB. Are you sure? [y/n]")
+					fmt.Print("Delete all the messages from the DB. Are you sure? [y/n] ")
 					yorn := getInput()
 					if((yorn=="Y") || (yorn=="y")) {
-						fmt.Println("Are you really, really sure? [y/n]")
+						fmt.Print("Are you really, really sure? [y/n] ")
 						yorn = getInput()
 						if((yorn=="Y") || (yorn=="y")) {
 							// Purge the DB but not the message store
@@ -121,6 +127,8 @@ func main() {
 		G_logFileFile2.WriteString(banner)
 	}
 
+	createSQLiteTables()
+	
 	c, err := ReadConfigFile(CONFIGFILE);
 	if(err==nil) {
 		// Need to check the presence of these variables

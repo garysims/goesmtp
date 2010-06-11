@@ -26,13 +26,13 @@ import (
 "os"
 "regexp"
 "fmt"
-"mysql"
 "bufio"
 "time"
 "container/list"
 "sync"
 "strings"
 "net"
+"gosqlite.googlecode.com/hg/sqlite"
 )
 
 
@@ -153,11 +153,7 @@ func (myRouter *routerStruct) askForPasswords() {
 
 type routerStruct struct {
 	logger *LogStruct
-	DBusername string
-	DBpassword string
-	DBhost string
-	DBdatabase string
-	db *mysql.MySQL
+	nml *sqlite.Conn
 }
 
 func NewRouter() (myRouter *routerStruct) {
@@ -168,14 +164,6 @@ func NewRouter() (myRouter *routerStruct) {
 	
 	myRouter.logger.Log(LMIN, "Starting...")
 	
-	c, err := ReadConfigFile(CONFIGFILE);
-	if(err==nil) {
-		myRouter.DBusername, _ = c.GetString("db", "username");
-		myRouter.DBpassword, _ = c.GetString("db", "password");
-		myRouter.DBhost, _ = c.GetString("db", "host");
-		myRouter.DBdatabase, _ = c.GetString("db", "database");
-	}
-
 	myRouter.connectToDB()
  
  	return
@@ -184,13 +172,15 @@ func NewRouter() (myRouter *routerStruct) {
 func (myRouter *routerStruct) updateNewMessageLog(sha1 string, sz int64, mailbox string) bool {
 
 	id := getIDFromIDServer()
-	sql := fmt.Sprintf("INSERT INTO newMessageLog (id, sha1, mailbox, size) VALUES ('%s', '%s', '%s', '%d')", id, sha1, mailbox, sz)
+	sql := fmt.Sprintf("INSERT OR FAIL INTO newMessageLog (id, sha1, mailbox, size) VALUES (%s, '%s', '%s', %d)", id, sha1, mailbox, sz)
 	myRouter.logger.Logf(LMAX, "updateNewMessageLog SQL: %s", sql)
 
-	myRouter.db.Query(sql)
-	if myRouter.db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", myRouter.db.Errno, myRouter.db.Error)
-			return false
+	G_nmlDBLock.Lock()
+	serr := myRouter.nml.Exec(sql)
+	G_nmlDBLock.Unlock()
+	if(serr!=nil) {
+		myRouter.logger.Logf(LMIN, "Unexpected error using DB (%s): %s", sql, serr)
+		return false
 	}
 	
 	return true
@@ -447,15 +437,12 @@ func (myRouter *routerStruct) route(f string) {
 }
 
 func (myRouter *routerStruct) connectToDB() {
-	// Create new instance
-	myRouter.db = mysql.New()
-	// Enable/Disable logging
-	myRouter.db.Logging = false
-	// Connect to database
-	myRouter.db.Connect(myRouter.DBhost, myRouter.DBusername, myRouter.DBpassword, myRouter.DBdatabase)
-	if myRouter.db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", myRouter.db.Errno, myRouter.db.Error)
-			os.Exit(1)
+	var err os.Error
+	
+	myRouter.nml, err = sqlite.Open("/var/spool/goesmtp/newMessageLog.db")
+	if(err!=nil) {
+		fmt.Printf("Can't open the newMessageLog database. FATAL: %s\n", err)
+		os.Exit(-1)
 	}
 }
 
