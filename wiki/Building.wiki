@@ -10,8 +10,7 @@
   # Install gosqlite.googlecode.com/hg/sqlite
     * cd $GOROOT/src/pkg
     * mkdir gosqlite.googlecode.com/hg
-    * hg clone http://gosqlite.googlecode.com/hg \
-         gosqlite.googlecode.com/hg
+    * hg clone http://gosqlite.googlecode.com/hg gosqlite.googlecode.com/hg
     * cd gosqlite.googlecode.com/hg/sqlite
     * make install 
   # Get Source for GoESMTP
