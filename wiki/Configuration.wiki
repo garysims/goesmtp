@@ -1,41 +1,10 @@
 #summary Configuration
 
-To get goesmtp up and running you need to configure MySQL and create a config.cfg file in the goesmtp working directory.
+To get goesmtp up and running you need to create a /etc/goesmtp.cfg file.
 
-= MySQL =
+= /etc/goesmtp.cfg =
 
-
-Login as the root user to the MySQL database... You will need to know the MySQL root user password. This is different to the root user account. The MySQL root user account was most likley set during installation.
-
-{{{
-$ mysql -u root -p
-}}}
-
-Now create the database
-
-{{{
-mysql> create database goesmtp;
-}}}
-
-Now create a user who has access to the newly created database.
-
-_Note:_ If you are using OS X (with MAMP) use the IP address (i.e. 'goesmtp'@'192.168.1.2') as MAMP stores the mysql.sock file in a different place than Linux. For Linux use localhost
-
-{{{
-CREATE USER 'goesmtp@localhost' IDENTIFIED BY 'password';
-
-GRANT ALL PRIVILEGES ON * . * TO 'goesmtp@localhost' IDENTIFIED BY 'password' WITH GRANT OPTION MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0 ;
-
-GRANT ALL PRIVILEGES ON `goesmtp\_%` . * TO 'goesmtp@localhost';
-}}}
-
-And finally add the tables from the [MySQLTables] page.
-
-= config.cfg =
-
-_Note:_ For OS X (with MAMP) use host=192.168.1.2 where 192.168.1.2 is the IP of the server.
-
-_Master:_ This is an example config.cfg for a single node system or for the master node in a cluster.
+_Master:_ This is an example goesmtp.cfg for a single node system or for the master node in a cluster.
 
 {{{
 # goESMTP server configuration file
@@ -49,16 +18,10 @@ key=sharedsecret
 [smtp]
 domain=example.com
 
-[db]
-type=MySQL
-username=username
-password=password
-host=localhost
-database=goesmtp
 # End
 }}}
 
-_Slave:_ This is an example config.cfg for a slave (secondary) node in a cluster.
+_Slave:_ This is an example goesmtp.cfg for a slave (secondary) node in a cluster.
 
 {{{
 # goESMTP server configuration file
@@ -72,12 +35,6 @@ key=sharedsecret
 [smtp]
 domain=example.com
 
-[db]
-type=MySQL
-username=user
-password=password
-host=localhost
-database=goesmtp
 # End
 }}}
 
