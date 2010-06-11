@@ -25,21 +25,17 @@ package main
 import (
 "os"
 "fmt"
-"mysql"
 "net"
 "bufio"
 "strings"
 "strconv"
+"gosqlite.googlecode.com/hg/sqlite"
 )
 
 
 type DHTForceSyncStruct struct {
 	logger *LogStruct
-	DBusername string
-	DBpassword string
-	DBhost string
-	DBdatabase string
-	db *mysql.MySQL
+	dht *sqlite.Conn
 }
 
 func NewDHTForceSync() (myDHTForceSync *DHTForceSyncStruct) {
@@ -50,15 +46,7 @@ func NewDHTForceSync() (myDHTForceSync *DHTForceSyncStruct) {
 	myDHTForceSync.logger = NewLogger("DHT Force Sync ", G_LoggingLevel)
 	
 	myDHTForceSync.logger.Log(LMIN, "Starting...")
-	
-	c, err := ReadConfigFile(CONFIGFILE);
-	if(err==nil) {
-		myDHTForceSync.DBusername, _ = c.GetString("db", "username");
-		myDHTForceSync.DBpassword, _ = c.GetString("db", "password");
-		myDHTForceSync.DBhost, _ = c.GetString("db", "host");
-		myDHTForceSync.DBdatabase, _ = c.GetString("db", "database");
-	}
-	
+		
 	myDHTForceSync.connectToDB()
  
  	myDHTForceSync.forceSync()
@@ -67,24 +55,13 @@ func NewDHTForceSync() (myDHTForceSync *DHTForceSyncStruct) {
 }
 
 func (myDHTForceSync *DHTForceSyncStruct) connectToDB() {
-	// Create new instance
-	myDHTForceSync.db = mysql.New()
-	// Enable/Disable logging
-	myDHTForceSync.db.Logging = false
-	// Connect to database
-	myDHTForceSync.db.Connect(myDHTForceSync.DBhost, myDHTForceSync.DBusername, myDHTForceSync.DBpassword, myDHTForceSync.DBdatabase)
-	if myDHTForceSync.db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", myDHTForceSync.db.Errno, myDHTForceSync.db.Error)
-			os.Exit(1)
-	}
+	var err os.Error
 	
-	q := fmt.Sprintf("use %s;", myDHTForceSync.DBdatabase)
-	myDHTForceSync.db.Query(q)
-	if myDHTForceSync.db.Errno != 0 {
-		fmt.Printf("Error #%d %s\n", myDHTForceSync.db.Errno, myDHTForceSync.db.Error)
-		os.Exit(1)
+	myDHTForceSync.dht, err = sqlite.Open("/var/spool/goesmtp/DHT.db")
+	if(err!=nil) {
+		fmt.Printf("Can't open the DHT database. FATAL: %s\n", err)
+		os.Exit(-1)
 	}
-	
 }
 
 //
@@ -97,11 +74,11 @@ func (myDHTForceSync *DHTForceSyncStruct) forceSync() {
 	rowsreceived := 0
 	
 	// Empty the current DHT table
-	myDHTForceSync.db.Query("TRUNCATE TABLE DHT;")
-	if myDHTForceSync.db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", myDHTForceSync.db.Errno, myDHTForceSync.db.Error)
+	delerr := myDHTForceSync.dht.Exec("DELETE FROM DHT;")
+	if(delerr!=nil) {
+		fmt.Printf("Can't delete table dht. FATAL.\n")
+		os.Exit(-1)
 	}
-	
 	
 	m := fmt.Sprintf("%s:4322", G_masterNode)
 	con, errdial := net.Dial("tcp", "", m)
@@ -147,9 +124,9 @@ fmt.Printf("forceSync: %s\n", string(lineofbytes))
 				sql = fmt.Sprintf("INSERT INTO DHT (id, sha1, mailbox, cached, size, orignodeid) VALUES ('%s', '%s', '%s', NULL, '%s', '%s')", fields[0], fields[1], fields[2], fields[3], fields[4])
 				myDHTForceSync.logger.Logf(LMAX, "forceSync SQL: %s", sql)
 
-				myDHTForceSync.db.Query(sql)
-				if myDHTForceSync.db.Errno != 0 {
-						fmt.Printf("Error #%d %s\n", myDHTForceSync.db.Errno, myDHTForceSync.db.Error)
+				serr := myDHTForceSync.dht.Exec(sql)
+				if(serr!=nil) {
+					myDHTForceSync.logger.Logf(LMIN, "Unexpected error using DB (%s): %s", sql, serr)
 				}
 				rowsreceived++
 			}

@@ -202,7 +202,9 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 							rcptsi = 0			
 							mailfrom = string(lineofbytesL)
 							mailfromaddr := string(getAddressFromMailFrom(lineofbytes))
-							if((strings.Index(mailfromaddr, "@") != -1) && (strings.Index(mailfromaddr, ".") != -1)) {
+							// MAIL FROM:<> is valid
+							// Known as NULL return path; see RFC 2821 section 6.1
+							if(len(mailfromaddr)==0) || ((strings.Index(mailfromaddr, "@") != -1) && (strings.Index(mailfromaddr, ".") != -1)) {
 								con.Write([]byte("250 OK\r\n"))
 							} else {
 								con.Write([]byte("550 Bad email address\r\n"))							
@@ -248,7 +250,7 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 							
 							if (mySMTP.recvBodyToFile(con, hostname, helodomain, ehlodomain, msgFilename) == true) {
 								mvToInQueue(msgFilename)
-								mySMTP.logger.Logf(LMIN, "New message received from %s (%s)\n", mailfrom, msgFilename)
+								mySMTP.logger.Logf(LMIN, "New message received - %s (%s)\n", mailfrom, msgFilename)
 								con.Write([]byte("250 OK\r\n"))
 							} else {
 								con.Write([]byte("554 Transaction failed\r\n"))

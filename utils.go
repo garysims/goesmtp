@@ -31,7 +31,7 @@ import (
 "net"
 "bytes"
 "encoding/base64"
-"mysql"
+"gosqlite.googlecode.com/hg/sqlite"
 )
 
 // Hashes a byte slice and returns a 20 byte string.
@@ -479,76 +479,49 @@ func getInput() string {
 }
 
 func truncateAllTables () {
-
-
-	c, err := ReadConfigFile(CONFIGFILE);
-	if(err!=nil) {
-			fmt.Printf("Can't read config file\n")
-			os.Exit(-1)
-	}
 		
-	DBusername, _ := c.GetString("db", "username");
-	DBpassword, _ := c.GetString("db", "password");
-	DBhost, _ := c.GetString("db", "host");
-	DBdatabase, _ := c.GetString("db", "database");
-	nodeID, _ := c.GetString("cluster", "id");
-
-	// Create new instance
-	db := mysql.New()
-	// Enable/Disable logging
-	db.Logging = false
-	// Connect to database
-	db.Connect(DBhost, DBusername, DBpassword, DBdatabase)
-	if db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
-			os.Exit(1)
+	dht, err := sqlite.Open("/var/spool/goesmtp/DHT.db")
+	if(err!=nil) {
+		fmt.Printf("Can't open the DHT database. FATAL: %s\n", err)
+		os.Exit(-1)
 	}
 
+
+	nml, err := sqlite.Open("/var/spool/goesmtp/newMessageLog.db")
+	if(err!=nil) {
+		fmt.Printf("Can't open the DHT database. FATAL: %s\n", err)
+		os.Exit(-1)
+	}
+
+	dml, err := sqlite.Open("/var/spool/goesmtp/delMessageLog.db")
+	if(err!=nil) {
+		fmt.Printf("Can't open the DHT database. FATAL: %s\n", err)
+		os.Exit(-1)
+	}
 
 	// Empty the current DHT table
-	db.Query("TRUNCATE TABLE DHT;")
-	if db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
+	err = dht.Exec("DELETE FROM DHT;")
+	if(err!=nil) {
+		fmt.Printf("Can't delete table dht. FATAL.\n")
+		os.Exit(-1)
 	}
 
 	// Empty the current newMessageLog table
-	db.Query("TRUNCATE TABLE newMessageLog;")
-	if db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
+	err = nml.Exec("DELETE FROM newMessageLog;")
+	if(err!=nil) {
+		fmt.Printf("Can't delete table newMessageLog. FATAL.\n")
+		os.Exit(-1)
 	}
 
 	// Empty the current delMessageLog table
-	db.Query("TRUNCATE TABLE delMessageLog;")
-	if db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
+	err = dml.Exec("DELETE FROM delMessageLog;")
+	if(err!=nil) {
+		fmt.Printf("Can't delete table delMessageLog. FATAL.\n")
+		os.Exit(-1)
 	}
 	
-	// Empty the current delMessageCounter table
-	db.Query("TRUNCATE TABLE delMessageCounter;")
-	if db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
-	}
-
-	sql := fmt.Sprintf("INSERT INTO delMessageCounter (id, nodeid) VALUES ('0', '%s')", nodeID)	
-	// Set delMessageCounter to 0
-	db.Query(sql)
-	if db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
-	}
-	
-	// Empty the current newMessageCounter table
-	db.Query("TRUNCATE TABLE newMessageCounter;")
-	if db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
-	}
-
-	sql = fmt.Sprintf("INSERT INTO newMessageCounter (id, nodeid) VALUES ('0', '%s')", nodeID)	
-	// Set newMessageCounter to 0
-	db.Query(sql)
-	if db.Errno != 0 {
-			fmt.Printf("Error #%d %s\n", db.Errno, db.Error)
-	}
-	
+	os.Remove(NEWMESSAGECOUNTERFILE)
+	os.Remove(DELMESSAGECOUNTERFILE)
 }
 
 func compareConWithIPString(con *net.TCPConn, ip2 string) bool {
@@ -578,3 +551,74 @@ func isNodeAuthenticated(con *net.TCPConn) bool {
 	return false
 }
 
+func createSQLiteTables() {
+
+	// DHT
+	dht, err := sqlite.Open("/var/spool/goesmtp/DHT.db")
+	if(err!=nil) {
+		fmt.Printf("Can't open the DHT database. FATAL: %s\n", err)
+		os.Exit(-1)
+	}
+	
+	err = dht.Exec("create table if not exists dht ( id, sha1, mailbox, cached, size, orignodeid );")
+	if(err!=nil) {
+		fmt.Printf("Can't create table dht. FATAL.\n")
+		os.Exit(-1)
+	}
+
+	// Don't check the errors on these as if they already exist it will 
+	// produce an error... There is probably a better way in which
+	// the error can be checked and ignored if it is the already exits.
+	dht.Exec("create index dht_sha1_idx on dht(sha1);")
+	dht.Exec("create index dht_id_idx on dht(id);")
+	dht.Exec("create index dht_mailbox_idx on dht(mailbox);")
+	
+	dht.Close()
+
+	// newMessageLog
+	nml, err := sqlite.Open("/var/spool/goesmtp/newMessageLog.db")
+	if(err!=nil) {
+		fmt.Printf("Can't open the newMessageLog database. FATAL: %s\n", err)
+		os.Exit(-1)
+	}
+	
+	err = nml.Exec("create table if not exists newMessageLog ( id, sha1, mailbox, size );")
+	if(err!=nil) {
+		fmt.Printf("Can't create table newMessageLog. FATAL.\n")
+		os.Exit(-1)
+	}
+
+	// Don't check the errors on these as if they already exist it will 
+	// produce an error... There is probably a better way in which
+	// the error can be checked and ignored if it is the already exits.
+	nml.Exec("create index nml_sha1_idx on newMessageLog(sha1);")
+	nml.Exec("create index nml_id_idx on newMessageLog(id);")
+	nml.Exec("create index nml_mailbox_idx on newMessageLog(mailbox);")
+	
+	nml.Close()
+
+
+	// delMessageLog
+	dml, err := sqlite.Open("/var/spool/goesmtp/delMessageLog.db")
+	if(err!=nil) {
+		fmt.Printf("Can't open the delMessageLog database. FATAL: %s\n", err)
+		os.Exit(-1)
+	}
+	
+	err = dml.Exec("create table if not exists delMessageLog ( id, sha1, mailbox );")
+	if(err!=nil) {
+		fmt.Printf("Can't create table delMessageLog. FATAL.\n")
+		os.Exit(-1)
+	}
+
+	// Don't check the errors on these as if they already exist it will 
+	// produce an error... There is probably a better way in which
+	// the error can be checked and ignored if it is the already exits.
+	dml.Exec("create index nml_sha1_idx on delMessageLog(sha1);")
+	dml.Exec("create index nml_id_idx on delMessageLog(id);")
+	dml.Exec("create index nml_mailbox_idx on delMessageLog(mailbox);")
+	
+	dml.Close()
+
+
+}
