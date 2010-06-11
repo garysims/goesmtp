@@ -125,7 +125,7 @@ func (myDHTServer *DHTServerStruct) processRemoteNewMessageLog() {
 					execerr := myDHTServer.dht.Exec(sql)
 					G_dhtDBLock.Unlock()
 					if execerr != nil {
-						myDHTServer.logger.Logf(LMIN, "Unexpected error using DB (%s): %s", sql, execerr)
+						myDHTServer.logger.Logf(LMIN, "processRemoteNewMessageLog - Unexpected error using DB (%s): %s", sql, execerr)
 
 						return
 					}
@@ -197,7 +197,7 @@ func (myDHTServer *DHTServerStruct) processNewMessageLog() int{
 		execerr := myDHTServer.dht.Exec(sql)
 		G_dhtDBLock.Unlock()
 		if execerr != nil {
-			myDHTServer.logger.Logf(LMIN, "Unexpected error using DB (%s): %s", sql, execerr)
+			myDHTServer.logger.Logf(LMIN, "processNewMessageLog - Unexpected error using DB (%s): %s", sql, execerr)
 		}
 		
 		// Update the counters
@@ -296,7 +296,7 @@ func (myDHTServer *DHTServerStruct) processRemoteDelMessageLog() {
 					fields := strings.Split(string(lineofbytes), ",", 0)
 		
 					if(len(fields) != 4) {
-						// Not enough fields, just list nodes in cluster and exit
+						// Not enough fields
 						myDHTServer.logger.Log(LMIN, "Unexpected result (not enough fields) during processRemoteDelMessageLog.")					
 						return
 					}
@@ -482,7 +482,7 @@ func (myDHTServer *DHTServerStruct) sendNewMessageLog(con *net.TCPConn, hid stri
 				myDHTServer.logger.Logf(LMIN, "Unexpected error using DB: %s", err)	
         		break
         	}
-			reply := fmt.Sprintf("%d,%s,%s,%d,%d\r\n", id, sha1, mailbox, size, G_nodeID)
+			reply := fmt.Sprintf("%d,%s,%s,%d,%s\r\n", id, sha1, mailbox, size, G_nodeID)
 			r.PushBack(reply)
         	rowcount++
 		}
@@ -502,7 +502,7 @@ func (myDHTServer *DHTServerStruct) sendNewMessageLog(con *net.TCPConn, hid stri
 func (myDHTServer *DHTServerStruct) sendDelMessageLog(con *net.TCPConn, hid string) {
 
 	// Query delMessageLog
-	sql := fmt.Sprintf("SELECT id, sha1, mailbox, size FROM delMessageLog where id > %s order by id", hid)
+	sql := fmt.Sprintf("SELECT id, sha1, mailbox FROM delMessageLog where id > %s order by id", hid)
 	G_dmlDBLock.Lock()
 	stmt, serr := myDHTServer.dml.Prepare(sql)
 	defer stmt.Finalize()
@@ -511,19 +511,18 @@ func (myDHTServer *DHTServerStruct) sendDelMessageLog(con *net.TCPConn, hid stri
 		var id int
 		var sha1 string
 		var mailbox string
-		var size int
 		
 		var r list.List
 		r.Init()
  		stmt.Exec()
  		rowcount := 0
 		for stmt.Next() {
-        	err := stmt.Scan(&id, &sha1, &mailbox, &size)
+        	err := stmt.Scan(&id, &sha1, &mailbox)
         	if(err != nil) {
 				myDHTServer.logger.Logf(LMIN, "Unexpected error using DB: %s", err)	
         		break
         	}
-			reply := fmt.Sprintf("%d,%s,%s,%d,%d\r\n", id, sha1, mailbox, size, G_nodeID)
+			reply := fmt.Sprintf("%d,%s,%s,%s\r\n", id, sha1, mailbox, G_nodeID)
 			r.PushBack(reply)
         	rowcount++
 		}
@@ -798,7 +797,6 @@ func (myDHTServer *DHTServerStruct) retrieveMessage(con *net.TCPConn, sha string
 		con.Write([]byte("-ERR no such message\r\n"))
 		return
 	}
-	con.Write([]byte(".\r\n"))
 }
 
 func (myDHTServer *DHTServerStruct) handleConnection(con *net.TCPConn) {

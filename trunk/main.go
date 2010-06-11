@@ -121,6 +121,10 @@ func main() {
 		G_logFileFile2 = os.Stdout
 	}
 	
+	// Symbolic link to latest log
+	os.Remove("/var/log/goesmtp/goesmtp.log")
+	os.Symlink(lfn, "/var/log/goesmtp/goesmtp.log")
+	
 	banner := fmt.Sprintf("GoESMTP %s starting %s\n", VERSION, time.LocalTime().Format("Mon, 02 Jan 2006 15:04:05 -0700"))
 	G_logFileFile.WriteString(banner)
 	if(G_logFileFile2 != nil) {

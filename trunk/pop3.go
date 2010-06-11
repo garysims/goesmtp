@@ -308,6 +308,7 @@ func (myPOP3 *POP3Struct) doRemoteRETR(con *net.TCPConn, sha1 string, orignodeid
 				}
 			}
 			// OK, message received and sent to POP3 client
+			con.Write([]byte(".\r\n"))
 			return
 			
 		} else {
@@ -318,6 +319,88 @@ func (myPOP3 *POP3Struct) doRemoteRETR(con *net.TCPConn, sha1 string, orignodeid
 	// TBD: If there is no local cache or the original node doesn't have it or is unavailable
 	// try another node in the cluster that is replicating the messages
 	myPOP3.logger.Log(LMED, "doRemoteRETR - Send -ERR to POP3 client")
+	con.Write([]byte("-ERR Message not available.\r\n"))
+}
+
+func (myPOP3 *POP3Struct) doRemoteTOP(con *net.TCPConn, sha1 string, orignodeid string, numlines int) {
+	// TDB: Check cache, is there a local copy?
+	
+	// Try the original node (the receiving node)
+	ip := findNodeIPFromNodeID(orignodeid)
+	if(ip=="") {
+		// Node not up or in cluster at the moment
+		con.Write([]byte("-ERR Message not available.\r\n"))
+		return
+	}
+	
+	m := fmt.Sprintf("%s:4322", ip)	
+	dcon, errdial := net.Dial("tcp", "", m)
+	
+	if(errdial != nil) {
+		myPOP3.logger.Log(LMAX, "Network connection unexpectedly closed.")			
+		return	
+	}
+
+	// Get greeting
+	buf := bufio.NewReader(dcon);
+	lineofbytes, err := buf.ReadBytes('\n');
+	if err != nil {
+		myPOP3.logger.Log(LMAX, "Network connection unexpectedly closed.")			
+		return
+	}
+	
+	dcon.Write([]byte(fmt.Sprintf("RETR %s\r\n", sha1)))
+	
+	// Reply is like POP3 (+OK or -ERR)
+	lineofbytes, err = buf.ReadBytes('\n');
+	if err != nil {
+		dcon.Close()
+		myPOP3.logger.Log(LMIN, "Network connection unexpected closed while receiving results.")			
+		return
+	} else {
+		lineofbytes = TrimCRLF(lineofbytes)
+		myPOP3.logger.Logf(LMAX, "S: %s", string(lineofbytes))			
+		if(lineofbytes[0]=='+') {
+			con.Write([]byte("+OK top of message follows\r\n"))			
+			// Read the rest of the message and send it back to the POP3 client	
+			foundbody := false
+			i := 0
+			for {
+				lineofbytes, err = buf.ReadBytes('\n');
+				if err != nil {
+					dcon.Close()
+					break
+				} else {
+					con.Write(lineofbytes)
+				}
+				if(len(lineofbytes)==2) {
+					// Found \r\n which marks end of header and start of body
+					foundbody = true
+				}
+						
+				if foundbody {
+					i++
+				}
+						
+				if i > numlines {
+					break
+				}
+				
+				// TDB - FIX ME - The dot
+				
+			}
+			// OK, message received and sent to POP3 client
+			con.Write([]byte(".\r\n"))
+			return
+			
+		} else {
+			myPOP3.logger.Logf(LMED, "Received -ERR from other sever: %s", string(lineofbytes))					
+		}
+	}
+					
+	// TBD: If there is no local cache or the original node doesn't have it or is unavailable
+	// try another node in the cluster that is replicating the messages
+	myPOP3.logger.Log(LMED, "doRemoteTOP - Send -ERR to POP3 client")
 	con.Write([]byte("-ERR Message not available.\r\n"))
 }
 
@@ -372,6 +455,88 @@ func (myPOP3 *POP3Struct) doRETR(con *net.TCPConn, user string, msgnumstr string
 					}
 				} else {
 					myPOP3.logger.Logf(LMIN, "doRETR - Can't open file: %s", fn)
+				}
+				con.Write([]byte(".\r\n"))
+				return
+			}
+		}
+		con.Write([]byte("-ERR no such message\r\n"))
+	} else {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB (%s): %s", sql, serr)
+	}
+}
+
+func (myPOP3 *POP3Struct) doTOP(con *net.TCPConn, user string, msgnumstr string, numlinesstr string) {
+	msgnum, err := strconv.Atoi(msgnumstr)
+	if(err != nil) {
+		con.Write([]byte("-ERR eh?\r\n"))	
+		return
+	}
+
+	numlines, err := strconv.Atoi(numlinesstr)
+	if(err != nil) {
+		con.Write([]byte("-ERR eh?\r\n"))	
+		return
+	}
+	
+	// Query DHT
+	sql := fmt.Sprintf("SELECT id, sha1, orignodeid from DHT where mailbox='%s' order by id limit %d, 1;", user, msgnum - 1)
+	G_dhtDBLock.Lock()
+	stmt, serr := myPOP3.dht.Prepare(sql)
+	defer stmt.Finalize()
+	defer G_dhtDBLock.Unlock()
+	if(serr == nil) {
+		stmt.Exec()
+
+		var id int
+		var sha1 string
+		var orignodeid string
+		for stmt.Next() {
+        	err := stmt.Scan(&id, &sha1, &orignodeid)
+        	if(err != nil) {
+				myPOP3.logger.Logf(LMIN, "Unexpected error using DB: %s", err)	
+        		break
+        	}
+
+
+			if(orignodeid != G_nodeID) {
+				// Need to get the message from another server in the cluster
+				myPOP3.logger.Logf(LMED, "Need to get the message from another server in the cluster: %s", orignodeid)
+				myPOP3.doRemoteTOP(con, sha1, orignodeid, numlines)
+				return
+			} else {
+				fn := filename822AndPathFromSHA(sha1)
+	
+				body, errb := os.Open(fn, os.O_RDONLY, 0666)
+		
+				if (errb == nil) {
+					buf := bufio.NewReader(body);
+					con.Write([]byte("+OK top of message follows\r\n"))
+					foundbody := false
+					i:=0
+					for {
+						lineofbytes, errl := buf.ReadBytes('\n');
+						if errl != nil {
+							body.Close()
+							break
+						} else {
+							con.Write(lineofbytes)
+						}
+						if(len(lineofbytes)==2) {
+							// Found \r\n which marks end of header and start of body
+							foundbody = true
+						}
+						
+						if foundbody {
+							i++
+						}
+						
+						if i > numlines {
+							break
+						}
+					}
+				} else {
+					myPOP3.logger.Logf(LMIN, "doTOP - Can't open file: %s", fn)
 				}
 				con.Write([]byte(".\r\n"))
 				return
@@ -592,7 +757,16 @@ func (myPOP3 *POP3Struct) handleConnection(con *net.TCPConn) {
 						}
 						break;
 					case topCmd.Match(lineofbytesU):
-						con.Write([]byte("-ERR eh?\r\n"))
+						if(authenticated==false) {
+							con.Write([]byte("-ERR Authenticate first please\r\n"))
+						} else {					
+							f := strings.Split(string(lineofbytes), " ", 0)					
+							if(len(f)!=3) {
+								con.Write([]byte("-ERR eh?\r\n"))
+							} else {
+								myPOP3.doTOP(con, user, f[1], f[2])
+							}
+						}					
 						break;
 					case uidlCmd.Match(lineofbytesU):
 						if(authenticated==false) {
