@@ -28,7 +28,7 @@ import (
 "sync"
 )
 
-const VERSION = "V0.1r42"
+const VERSION = "V0.1r48"
 
 const MAXRCPT = 100
 const INQUEUEDIR = "/var/spool/goesmtp/in"
@@ -44,8 +44,10 @@ var G_masterNode string
 var G_nodeType string
 var G_nodeID string
 var G_IPAddress string
-var G_domainOverride string = ""
+var G_hostname string = ""
+var G_greetDomain string = ""
 var G_clusterKey string
+var G_dnsbl string = ""
 var G_logFileFile *os.File
 var G_logFileFile2 *os.File = nil
 
@@ -125,11 +127,8 @@ func main() {
 	os.Remove("/var/log/goesmtp/goesmtp.log")
 	os.Symlink(lfn, "/var/log/goesmtp/goesmtp.log")
 	
-	banner := fmt.Sprintf("GoESMTP %s starting %s\n", VERSION, time.LocalTime().Format("Mon, 02 Jan 2006 15:04:05 -0700"))
-	G_logFileFile.WriteString(banner)
-	if(G_logFileFile2 != nil) {
-		G_logFileFile2.WriteString(banner)
-	}
+	logger := NewLogger("MAIN ", G_LoggingLevel)
+	logger.Logf(LMIN, "GoESMTP %s starting %s\n", VERSION, time.LocalTime().Format("Mon, 02 Jan 2006 15:04:05 -0700"))
 
 	createSQLiteTables()
 	
@@ -137,12 +136,59 @@ func main() {
 	if(err==nil) {
 		// Need to check the presence of these variables
 		// otherwise exit
-		G_masterNode, _ = c.GetString("cluster", "master");
-		G_nodeType, _ = c.GetString("cluster", "type");
-		G_nodeID, _ = c.GetString("cluster", "id");
-		G_IPAddress, _ = c.GetString("cluster", "ip");
-		G_clusterKey, _ = c.GetString("cluster", "key");
-		G_domainOverride, _ = c.GetString("smtp", "domain");
+		var e os.Error
+		G_nodeType, e = c.GetString("cluster", "type");
+		if(e!=nil) {
+			logger.Logf(LERRORSONLY, "Error reading node type (cluster/type) from configuration file. FATAL.")
+			os.Exit(-1)
+		}
+		G_IPAddress, e = c.GetString("cluster", "ip");
+		if(e!=nil) {
+			logger.Logf(LERRORSONLY, "Error reading node IP address (cluster/ip) from configuration file. FATAL.")
+			os.Exit(-1)
+		}
+		G_masterNode, e = c.GetString("cluster", "master");
+		if(e!=nil) {
+			if(G_nodeType!="master") {
+				logger.Logf(LERRORSONLY, "Error reading master node IP address (cluster/master) from configuration file. FATAL.")
+				os.Exit(-1)
+			} else {
+				logger.Logf(LMIN, "WARNING: Setting master node IP address to %s", G_IPAddress)
+				G_masterNode = G_IPAddress
+			}
+		}
+		G_nodeID, e = c.GetString("cluster", "id");
+		if(e!=nil) {
+			if(G_nodeType!="master") {
+				logger.Logf(LERRORSONLY, "Error reading node ID (cluster/id) from configuration file. FATAL.")
+				os.Exit(-1)
+			} else {
+				logger.Logf(LMIN, "WARNING: Setting node ID to 1")
+				G_nodeID = "1"
+			}
+		}
+		G_clusterKey, e = c.GetString("cluster", "key");
+		if(e!=nil) {
+			if(G_nodeType!="master") {
+				logger.Logf(LERRORSONLY, "Error reading secret key (cluster/key) from configuration file. FATAL.")
+				os.Exit(-1)
+			} else {
+				logger.Logf(LMIN, "WARNING: No cluster key set. Should be OK if this is a single node configuration.")
+				G_nodeID = "1"
+			}
+		}
+		G_hostname, e = c.GetString("smtp", "hostname");
+		if(e!=nil) {
+			G_hostname, _ = os.Hostname()
+		}
+		G_greetDomain, e = c.GetString("smtp", "greetdomain");
+		if(e!=nil) {
+			G_greetDomain, _ = os.Hostname()
+		}
+		G_dnsbl, e = c.GetString("smtp", "dnsbl");
+		if(e!=nil) {
+			G_dnsbl = ""
+		}
 	} else {
 		print("Error reading configuation file.\n");
 	}
