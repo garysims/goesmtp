@@ -123,6 +123,28 @@ func (mySMTP *SMTPStruct) recvBodyToFile(con *net.TCPConn, helo string, ehlo str
 	return sts
 }
 
+func (mySMTP *SMTPStruct) isSpamServer(con *net.TCPConn) bool {
+	if(len(G_dnsbl)>0) {
+		raddr := con.RemoteAddr()
+		ipbits := strings.Split(raddr.String() , ":", 0)
+		ipdots := strings.Split(ipbits[0] , ".", 0)
+		dnsbllookup := fmt.Sprintf("%s.%s.%s.%s.%s", ipdots[3], ipdots[2], ipdots[1], ipdots[0], G_dnsbl)
+		mySMTP.logger.Logf(LCRAZY, "DNSBL lookup %s", dnsbllookup)
+		_, _, dnsbl_err := net.LookupHost(dnsbllookup)
+		if(dnsbl_err==nil) {
+			// Bad, this means the host was found in the DNSBL
+			mySMTP.logger.Logf(LMIN, "%s found in DNSBL. Rejecting connection", ipbits[0])		
+			return true
+		} else {
+			mySMTP.logger.Logf(LCRAZY, "%s not found in DNSBL. OK to proceed.", dnsbllookup)
+			return false
+		}
+	}
+	
+	// No DNSBL defined, so just return false (i.e. is NOT a spam server)
+	return false
+}
+
 func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 	
 	var mailfrom string = ""
@@ -150,20 +172,6 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 	raddr := con.RemoteAddr()
 	ipbits := strings.Split(raddr.String() , ":", 0)
 	mySMTP.logger.Logf(LMAX, "SMTP connection from %s", ipbits[0])
-	if(len(G_dnsbl)>0) {
-		ipdots := strings.Split(ipbits[0] , ".", 0)
-		dnsbllookup := fmt.Sprintf("%s.%s.%s.%s.%s", ipdots[3], ipdots[2], ipdots[1], ipdots[0], G_dnsbl)
-		mySMTP.logger.Logf(LCRAZY, "DNSBL lookup %s", dnsbllookup)
-		_, _, dnsbl_err := net.LookupHost(dnsbllookup)
-		if(dnsbl_err==nil) {
-			// Bad, this means the host was found in the DNSBL
-			mySMTP.logger.Logf(LMIN, "Found in DNSBL. Rejecting connection from %s", ipbits[0])		
-			con.Close()
-			return
-		} else {
-			mySMTP.logger.Logf(LCRAZY, "%s not found in DNSBL. OK to proceed.", dnsbllookup)
-		}
-	}
 	
 	// Send greeting
 	welcome := fmt.Sprintf("220 %s ESMTP\r\n", G_greetDomain)
@@ -186,9 +194,9 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 				 switch {
 					case quitCmd.Match(lineofbytesL):
 						con.Write([]byte("221 Bye for now\r\n"))
-						con.Close();
-						disconnected = true;
-						break;
+						con.Close()
+						disconnected = true
+						break
 					case heloCmd.Match(lineofbytesL):
 						helodomain = string(getDomainFromHELO(lineofbytes))
 						helor := fmt.Sprintf("250 %s nice to meet you.\r\n", helodomain)
@@ -196,7 +204,7 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 						// HELO / EHLO is also like a RSET
 						rcptsi = 0
 						mailfrom = ""
-						break;
+						break
 					case ehloCmd.Match(lineofbytesL):
 						ehlodomain = string(getDomainFromHELO(lineofbytes))
 						ehlor := fmt.Sprintf("250-%s\r\n", G_greetDomain)
@@ -206,11 +214,17 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 						// HELO / EHLO is also like a RSET
 						rcptsi = 0
 						mailfrom = ""
-						break;
+						break
 					case mailfromCmd.Match(lineofbytesL):
 						if( (len(helodomain) > 0) || (len(ehlodomain) > 0) ) {
 							// Beginning of a new mail transaction
 							rcptsi = 0			
+							// Check if spam server
+							if( (authenticated == false) && (mySMTP.isSpamServer(con)) ) {
+								con.Close()
+								disconnected = true
+								break
+							}
 							mailfrom = string(lineofbytesL)
 							mailfromaddr := string(getAddressFromMailFrom(lineofbytes))
 							// MAIL FROM:<> is valid
