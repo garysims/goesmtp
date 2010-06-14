@@ -808,8 +808,7 @@ func (myDHTServer *DHTServerStruct) handleConnection(con *net.TCPConn) {
 	retrCmd, _ := regexp.Compile("^RETR ")
 	passwordsCmd, _ := regexp.Compile("^PASSWORDS")
 
-	h, _ := os.Hostname()
-	chall := fmt.Sprintf("<%d.%d@%s>",os.Getpid(), time.Seconds(), h)
+	chall := fmt.Sprintf("<%d.%d@%s>",os.Getpid(), time.Seconds(), G_hostname)
 	con.Write([]byte(fmt.Sprintf("+OK %s\r\n", chall)))
 
 

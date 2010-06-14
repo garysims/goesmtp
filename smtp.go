@@ -33,7 +33,6 @@ import (
 
 type SMTPStruct struct {
 	logger *LogStruct
-	domains string
 }
 
 func NewSMTP() (mySMTP *SMTPStruct) {
@@ -43,11 +42,6 @@ func NewSMTP() (mySMTP *SMTPStruct) {
 	mySMTP.logger = NewLogger("SMTP ", G_LoggingLevel)
 	
 	mySMTP.logger.Log(LMIN, "Starting...")
-	
-	c, err := ReadConfigFile(CONFIGFILE);
-	if(err==nil) {
-		mySMTP.domains, _ = c.GetString("smtp", "domains");
-	}
 	
  	return
 }
@@ -92,7 +86,7 @@ func (mySMTP *SMTPStruct) squirtHeaderToFile(helo string, ehlo string, mailfrom 
 }
 
 
-func (mySMTP *SMTPStruct) recvBodyToFile(con *net.TCPConn, hostname string, helo string, ehlo string, msgFilename string) bool {
+func (mySMTP *SMTPStruct) recvBodyToFile(con *net.TCPConn, helo string, ehlo string, msgFilename string) bool {
 	fn := fmt.Sprintf("%s.822.tmp", msgFilename)
 	disconnected := false
 	sts := true
@@ -151,11 +145,28 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 
 	disconnected := false
 	authenticated := false
-	hostname, _ := os.Hostname()
-	if(len(G_domainOverride) > 0) {
-		hostname = G_domainOverride
+	
+	// Check the remote server... Log IP and find out if SPAM server
+	raddr := con.RemoteAddr()
+	ipbits := strings.Split(raddr.String() , ":", 0)
+	mySMTP.logger.Logf(LMAX, "SMTP connection from %s", ipbits[0])
+	if(len(G_dnsbl)>0) {
+		ipdots := strings.Split(ipbits[0] , ".", 0)
+		dnsbllookup := fmt.Sprintf("%s.%s.%s.%s.%s", ipdots[3], ipdots[2], ipdots[1], ipdots[0], G_dnsbl)
+		mySMTP.logger.Logf(LCRAZY, "DNSBL lookup %s", dnsbllookup)
+		_, _, dnsbl_err := net.LookupHost(dnsbllookup)
+		if(dnsbl_err==nil) {
+			// Bad, this means the host was found in the DNSBL
+			mySMTP.logger.Logf(LMIN, "Found in DNSBL. Rejecting connection from %s", ipbits[0])		
+			con.Close()
+			return
+		} else {
+			mySMTP.logger.Logf(LCRAZY, "%s not found in DNSBL. OK to proceed.", dnsbllookup)
+		}
 	}
-	welcome := fmt.Sprintf("220 %s ESMTP\r\n", hostname)
+	
+	// Send greeting
+	welcome := fmt.Sprintf("220 %s ESMTP\r\n", G_greetDomain)
 	con.Write([]byte(welcome))
 
 	buf := bufio.NewReader(con);
@@ -188,7 +199,7 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 						break;
 					case ehloCmd.Match(lineofbytesL):
 						ehlodomain = string(getDomainFromHELO(lineofbytes))
-						ehlor := fmt.Sprintf("250-%s\r\n", hostname)
+						ehlor := fmt.Sprintf("250-%s\r\n", G_greetDomain)
 						con.Write([]byte(ehlor))
 						con.Write([]byte("250-AUTH=PLAIN CRAM-MD5\r\n"))
 						con.Write([]byte("250 AUTH PLAIN CRAM-MD5\r\n"))
@@ -248,7 +259,7 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 							msgFilename := getFilenameForMsg(workerid, msgsForThisConnection)
 							mySMTP.squirtHeaderToFile(helodomain, ehlodomain, mailfrom, rcpts, rcptsi, msgFilename)
 							
-							if (mySMTP.recvBodyToFile(con, hostname, helodomain, ehlodomain, msgFilename) == true) {
+							if (mySMTP.recvBodyToFile(con, helodomain, ehlodomain, msgFilename) == true) {
 								mvToInQueue(msgFilename)
 								mySMTP.logger.Logf(LMIN, "New message received - %s (%s)\n", mailfrom, msgFilename)
 								con.Write([]byte("250 OK\r\n"))
@@ -311,8 +322,7 @@ func (mySMTP *SMTPStruct) handleConnection(con *net.TCPConn, workerid int) {
 									}		
 								}
 							} else if(authtype=="cram-md5") {
-								h, _ := os.Hostname()
-								cram1 := fmt.Sprintf("<%d.%d@%s>",os.Getpid(), time.Seconds(), h)
+								cram1 := fmt.Sprintf("<%d.%d@%s>",os.Getpid(), time.Seconds(), G_hostname)
 								cram2 := fmt.Sprintf("334 %s\r\n", encodeBase64String(cram1))
 								con.Write([]byte(cram2))
 								lineofbytes, err := buf.ReadBytes('\n');

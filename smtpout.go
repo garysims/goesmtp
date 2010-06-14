@@ -98,12 +98,11 @@ func (mySMTPOut *smtpOutStruct) createNDN(sender string, failedrcptto string, or
 
 	if (err == nil) {
 		fd.WriteString("helo ")
-		h, _ := os.Hostname()
-		fd.WriteString(h);		
+		fd.WriteString(G_greetDomain);
 		fd.WriteString("\r\n");
 		
 		fd.WriteString("mail from:<mailer-daemon@")
-		fd.WriteString(h);		
+		fd.WriteString(G_greetDomain);
 		fd.WriteString(">\r\n");
 
 		fd.WriteString("rcpt to:<")
@@ -120,11 +119,10 @@ func (mySMTPOut *smtpOutStruct) createNDN(sender string, failedrcptto string, or
 	fd, err = os.Open(ndn822, os.O_CREATE | os.O_RDWR, 0666)
 
 	if (err == nil) {
-		h, _ := os.Hostname()
 		fd.WriteString("Return-Path: <>\r\n")
 		fd.WriteString("MIME-Version: 1.0\r\n")
 		fd.WriteString("From: Mail Delivery Subsystem <mailer-daemon@")
-		fd.WriteString(h)
+		fd.WriteString(G_greetDomain)
 		fd.WriteString(">\r\n")
 		fd.WriteString("To: ")
 		fd.WriteString(sender);		
@@ -133,7 +131,7 @@ func (mySMTPOut *smtpOutStruct) createNDN(sender string, failedrcptto string, or
 		fd.WriteString("Message-ID: <")
 		fd.WriteString(origfn822[0:len(origfn822)-4])
 		fd.WriteString("@")
-		fd.WriteString(h)
+		fd.WriteString(G_hostname)
 		fd.WriteString(">\r\n")
 		dateTime:= time.LocalTime().Format("Mon, 02 Jan 2006 15:04:05 -0700")
 		fd.WriteString("Date: ")
@@ -242,8 +240,7 @@ func (mySMTPOut *smtpOutStruct) sendBySMTP(fn821 string, fn822 string, mailfrom 
 				// TBD: All the cases when the wrong reponse is sent!
 				// TBD: ESMTP. Note the first 250 response can be multi line.
 				if(mySMTPOut.getAndCheckResp(buf, "220 ")==true) {
-					h, _ := os.Hostname()
-					con.Write([]byte(fmt.Sprintf("HELO %s\r\n", h)))
+					con.Write([]byte(fmt.Sprintf("HELO %s\r\n", G_greetDomain)))
 					if(mySMTPOut.getAndCheckResp(buf, "250 ")==true) {
 						con.Write([]byte(fmt.Sprintf("MAIL FROM:<%s>\r\n", mailfrom)))
 						if(mySMTPOut.getAndCheckResp(buf, "250 ")==true) {

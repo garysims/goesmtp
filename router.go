@@ -195,7 +195,6 @@ func (myRouter *routerStruct) addOurReceivedField(fd *os.File, mailfrom string, 
 
 	var wi, fr string = "", ""
 
-	hostname, _ := os.Hostname()
 	if(len(ehlo) != 0) {
 		wi = "ESMTP"
 		fr = ehlo
@@ -213,7 +212,7 @@ func (myRouter *routerStruct) addOurReceivedField(fd *os.File, mailfrom string, 
 
 	r := fmt.Sprintf("Received: from %s\r\n\tby %s with %s id %s\r\n\tfor %s;\r\n\t%s\r\n",
 		fr,
-		hostname,
+		G_hostname,
 		wi,
 		uid,
 		rcptto,

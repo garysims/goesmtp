@@ -636,8 +636,7 @@ func (myPOP3 *POP3Struct) handleConnection(con *net.TCPConn) {
 	disconnected := false
 	authenticated := false
 
-	h, _ := os.Hostname()
-	md5ts := fmt.Sprintf("<%d.%d@%s>",os.Getpid(), time.Seconds(), h)
+	md5ts := fmt.Sprintf("<%d.%d@%s>",os.Getpid(), time.Seconds(), G_hostname)
 	con.Write([]byte(fmt.Sprintf("+OK POP3 server ready %s\r\n", md5ts)))
 
 	buf := bufio.NewReader(con);
