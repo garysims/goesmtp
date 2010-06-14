@@ -16,7 +16,10 @@ ip=192.168.1.2
 key=sharedsecret
 
 [smtp]
-domain=example.com
+greetdomain=example.com
+#hostname=mail.example.com
+#dnsbl=dnsbl.sorbs.net
+#dnsbl=zen.spamhaus.org
 
 # End
 }}}
@@ -33,7 +36,10 @@ ip=192.168.1.3
 key=sharedsecret
 
 [smtp]
-domain=example.com
+greetdomain=example.com
+#hostname=mail.example.com
+#dnsbl=dnsbl.sorbs.net
+#dnsbl=zen.spamhaus.org
 
 # End
 }}}
