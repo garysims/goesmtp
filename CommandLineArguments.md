@@ -1,0 +1,5 @@
+GoESMTP has some command line arguments which make the server perform certain special tasks. They are:
+
+**forcesync - Empties the current hash table and grabs a current copy from the master node.** Useful when adding a new node to the cluster or repairing a broken node.
+purge - deletes everything in the message store and the hash table. Great for testing.
+**quickpurge - Same as purge but doesn't empty the message store. Nice and quick.** createdirs - Create the working directories.

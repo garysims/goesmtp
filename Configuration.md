@@ -1,0 +1,57 @@
+To get goesmtp up and running you need to create a /etc/goesmtp.cfg file.
+
+# /etc/goesmtp.cfg #
+
+_Master:_ This is an example goesmtp.cfg for a single node system or for the master node in a cluster.
+
+```
+# goESMTP server configuration file
+[cluster]
+type=master
+id=1
+master=192.168.1.2
+ip=192.168.1.2
+key=sharedsecret
+
+[smtp]
+greetdomain=example.com
+#hostname=mail.example.com
+#dnsbl=dnsbl.sorbs.net
+#dnsbl=zen.spamhaus.org
+
+# End
+```
+
+_Slave:_ This is an example goesmtp.cfg for a slave (secondary) node in a cluster.
+
+```
+# goESMTP server configuration file
+[cluster]
+type=slave
+id=2
+master=192.168.1.2
+ip=192.168.1.3
+key=sharedsecret
+
+[smtp]
+greetdomain=example.com
+#hostname=mail.example.com
+#dnsbl=dnsbl.sorbs.net
+#dnsbl=zen.spamhaus.org
+
+# End
+```
+
+# passwords.txt #
+The passwords.txt file defines the mailboxes for this mail server (across the whole cluster). The format is:
+```
+email-address:password:aliases
+```
+
+_Note:_ At the moment aliases aren't implemented.
+```
+fred@example.com:bluefish:
+bob@example.com:cola123:
+alice@example2.com:qwerty23:
+john@example2.com:zxc123pp:
+```

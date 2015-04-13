@@ -1,0 +1,9 @@
+The current code works as both a single node and in a cluster (tested with two nodes, but should work with 3 or more as well).
+
+Messages can be submitted (using SMTP AUTH PLAIN) and transmitted onwards. Messages can also be received from the Internet. POP3 is working.
+
+I have a VPS somewhere on the Internet with a copy of this server running and I am sending and receiving messages (and joining lots of mailing lists) to test the stability and compatibility of the server.
+
+**NOTE:** There ARE problems, deficiencies and things not yet implemented. Please see the [issues](http://code.google.com/p/goesmtp/issues/list) tab.
+
+Having said all that, it kind of works. Please give it a try and tell me what you think.

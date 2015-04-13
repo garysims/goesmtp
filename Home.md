@@ -1,0 +1,11 @@
+# Introduction #
+
+GoESMTP is EXPERIMENTAL and is not yet ready for beta testing or for production deployment. Please read the [status](status.md) page for the latest information regarding stability and functionality.
+
+GoESMTP is a multi-node ESMTP server written on Go. Designed from the ground up to work as a cluster, each node keeps an index of the available messages by using hashes which are distributed throughout the cluster.
+
+If a message is requested (over POP3 only at the moment, no IMAP4) that is not available on the local node, a request is sent to the node with the original message for transmission to the POP3 client.
+
+There is also a rudimentary level of replication and caching for redundancy and to minimize the inter-node traffic.
+
+More information: [Building](Building.md) and [Configuration](Configuration.md)
